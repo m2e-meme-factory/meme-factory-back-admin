@@ -5,7 +5,7 @@ import {
   Body,
   Param,
   Delete,
-  Put,
+  Patch,
 } from '@nestjs/common';
 import { ProjectService } from './project.service';
 import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
@@ -43,7 +43,7 @@ export class ProjectController {
     return this.projectService.findOne(+id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @ApiOperation({ summary: 'Обновить проект' })
   @ApiResponse({ status: 200, description: 'Проект обновлен.', type: CreateProjectDto })
   @ApiResponse({ status: 404, description: 'Проект не найден.' })

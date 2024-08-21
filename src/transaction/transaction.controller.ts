@@ -3,9 +3,9 @@ import {
   Get,
   Post,
   Body,
-  Put,
   Param,
   Delete,
+  Patch,
 } from '@nestjs/common';
 import { TransactionService } from './transaction.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
@@ -43,7 +43,7 @@ export class TransactionController {
     return this.transactionService.findOne(+id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @ApiOperation({ summary: 'Обновить транзакцию' })
   @ApiResponse({ status: 200, description: 'Транзакция обновлена.', type: CreateTransactionDto })
   @ApiResponse({ status: 404, description: 'Транзакция не найдена.' })

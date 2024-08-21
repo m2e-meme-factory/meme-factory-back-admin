@@ -1,5 +1,5 @@
 // src/user/user.controller.ts
-import { Controller, Get, Post, Body, Param, Delete, Put } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Delete, Patch } from '@nestjs/common';
 import { UserService } from './user.service';
 import { User } from '@prisma/client';
 import { ApiTags, ApiResponse } from '@nestjs/swagger';
@@ -34,7 +34,7 @@ export class UserController {
     return this.userService.findOne(id);
   }
 
-  @Put(':id')
+  @Patch(':id')
   @ApiResponse({ status: 200, description: 'The user has been successfully updated.', type: CreateUserDto })
   @ApiResponse({ status: 404, description: 'User not found' })
   @Auth('admin')

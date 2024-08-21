@@ -1,5 +1,5 @@
 // src/progress-project/progress-project.controller.ts
-import { Controller, Get, Post, Body, Param, Delete, Put } from '@nestjs/common'
+import { Controller, Get, Post, Body, Param, Delete, Patch } from '@nestjs/common'
 import { ProgressProjectService } from './progress-project.service'
 import { ProgressProject } from '@prisma/client'
 import { ApiTags, ApiResponse } from '@nestjs/swagger'
@@ -52,7 +52,7 @@ export class ProgressProjectController {
 		return this.progressProjectService.findOne(id)
 	}
 
-	@Put(':id')
+	@Patch(':id')
 	@ApiResponse({
 		status: 200,
 		description: 'Обновление прогресса проекта',
