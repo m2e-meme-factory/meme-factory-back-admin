@@ -51,6 +51,7 @@ model UserInfo {
   tonWalletAddress String?
   userId           Int     @unique
   user             User    @relation(fields: [userId], references: [id])
+
 }
 
 model Project {
@@ -102,6 +103,7 @@ model ProjectTask {
 
   @@id([projectId, taskId])
   @@map("project_task")
+
 }
 
 model UndelitableMessage {
@@ -157,6 +159,7 @@ model Event {
 }
 
 model MetaTag {
+
   id        Int      @id @default(autoincrement())
   tag       String
   userId    Int
