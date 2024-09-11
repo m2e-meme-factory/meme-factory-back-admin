@@ -1,0 +1,10 @@
+{
+    "apps": [
+        {
+            "name": "dev-mf-back-admin",
+            "script": "yarn",
+            "args": "start",
+            "automation": false
+        }
+    ]
+}

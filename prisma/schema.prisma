@@ -1,0 +1,199 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AutoTask {
+  id           Int      @id @default(autoincrement())
+  title        String?
+  description  String?
+  url          String?
+  createdAt    DateTime @default(now())
+  userId       Int
+  isConfirmed  Boolean  @default(false)
+  reward       Decimal
+  taskId       Int
+  isIntegrated Boolean  @default(false)
+  users        users    @relation(fields: [userId], references: [id])
+}
+
+model Event {
+  id                Int              @id @default(autoincrement())
+  projectId         Int
+  userId            Int
+  role              UserRole
+  eventType         EventType
+  description       String?
+  createdAt         DateTime         @default(now())
+  details           Json?
+  progressProjectId Int?
+  message           String?
+  ProgressProject   ProgressProject? @relation(fields: [progressProjectId], references: [id])
+  Project           Project          @relation(fields: [projectId], references: [id])
+  users             users            @relation(fields: [userId], references: [id])
+
+  @@index([projectId])
+  @@index([userId])
+}
+
+model ProgressProject {
+  id        Int            @id @default(autoincrement())
+  userId    Int
+  projectId Int
+  status    ProgressStatus @default(pending)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime
+  Event     Event[]
+  Project   Project        @relation(fields: [projectId], references: [id])
+  users     users          @relation(fields: [userId], references: [id])
+
+  @@unique([userId, projectId])
+}
+
+model Project {
+  id              Int               @id @default(autoincrement())
+  authorId        Int
+  title           String
+  description     String
+  bannerUrl       String?
+  files           Json?
+  tags            String[]
+  category        String
+  status          ProjectStatus     @default(draft)
+  Event           Event[]
+  ProgressProject ProgressProject[]
+  users           users             @relation(fields: [authorId], references: [id])
+  project_task    project_task[]
+  Task            Task[]
+}
+
+model Task {
+  id           Int            @id @default(autoincrement())
+  title        String
+  description  String
+  price        Decimal
+  project_task project_task[]
+  Project      Project[]
+  users        users[]        @relation("TaskToUser")
+}
+
+model Transaction {
+  id                                  Int             @id @default(autoincrement())
+  projectId                           Int?
+  taskId                              Int?
+  fromUserId                          Int?
+  toUserId                            Int
+  amount                              Decimal
+  createdAt                           DateTime        @default(now())
+  type                                TransactionType @default(PAYMENT)
+  users_Transaction_fromUserIdTousers users?          @relation("Transaction_fromUserIdTousers", fields: [fromUserId], references: [id])
+  users_Transaction_toUserIdTousers   users           @relation("Transaction_toUserIdTousers", fields: [toUserId], references: [id])
+}
+
+model UndelitableMessage {
+  message_id String @id
+  userId     String
+  users      users  @relation(fields: [userId], references: [telegramId])
+}
+
+model UserInfo {
+  id               Int     @id @default(autoincrement())
+  name             String?
+  phoneNumber      String?
+  email            String?
+  tonWalletAddress String?
+  userId           Int     @unique
+  users            users   @relation(fields: [userId], references: [id])
+}
+
+model meta_tags {
+  id        Int      @id @default(autoincrement())
+  tag       String
+  userId    Int
+  createdAt DateTime @default(now())
+  users     users    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], map: "userId_idx")
+}
+
+model project_task {
+  projectId Int
+  taskId    Int
+  Project   Project @relation(fields: [projectId], references: [id])
+  Task      Task    @relation(fields: [taskId], references: [id])
+
+  @@id([projectId, taskId])
+}
+
+model users {
+  id                                        Int                  @id @default(autoincrement())
+  telegramId                                String               @unique
+  username                                  String?
+  isBaned                                   Boolean              @default(false)
+  isVerified                                Boolean              @default(false)
+  createdAt                                 DateTime             @default(now())
+  inviterRefCode                            String?
+  refCode                                   String
+  role                                      UserRole             @default(creator)
+  balance                                   Decimal              @default(0)
+  isSended                                  Boolean              @default(false)
+  wasOpened                                 Boolean              @default(false)
+  AutoTask                                  AutoTask[]
+  Event                                     Event[]
+  ProgressProject                           ProgressProject[]
+  Project                                   Project[]
+  Transaction_Transaction_fromUserIdTousers Transaction[]        @relation("Transaction_fromUserIdTousers")
+  Transaction_Transaction_toUserIdTousers   Transaction[]        @relation("Transaction_toUserIdTousers")
+  UndelitableMessage                        UndelitableMessage[]
+  UserInfo                                  UserInfo?
+  meta_tags                                 meta_tags[]
+  Task                                      Task[]               @relation("TaskToUser")
+}
+
+enum EventType {
+  PROJECT_CREATED
+  PROJECT_UPDATED
+  PROJECT_DELETED
+  APPLICATION_SUBMITTED
+  APPLICATION_APPROVED
+  APPLICATION_REJECTED
+  TASK_COMPLETED
+  TASK_UPDATED
+  TRANSACTION_COMPLETED
+  DISPUTE_OPENED
+  DISPUTE_RESOLVED
+  USER_MESSAGE
+  RATING_GIVEN
+  TASK_SUBMIT
+  TASK_REJECTED
+}
+
+enum ProgressStatus {
+  pending
+  accepted
+  rejected
+}
+
+enum ProjectStatus {
+  draft
+  moderation
+  published
+  not_accepted
+  closed
+}
+
+enum TransactionType {
+  PAYMENT
+  DEPOSIT
+  WITHDRAWAL
+  SYSTEM
+}
+
+enum UserRole {
+  creator
+  advertiser
+}
