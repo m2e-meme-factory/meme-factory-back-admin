@@ -2,7 +2,9 @@ import { BadRequestException, Body, Controller, HttpCode, Post, UsePipes, Valida
 import { AuthService } from './auth.service';
 import { RefreshTokenDto } from './dto/refreshToken.dto';
 import { AuthDto } from './dto/auth.dto';
+import { ApiBearerAuth } from '@nestjs/swagger';
 
+@ApiBearerAuth('access-token')
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}

@@ -15,49 +15,51 @@ export class UserService {
 
 	async findAll(
 		filterDto: FilterUserDto
-	): Promise<{ data: User[]; total: number }> {
+	  ): Promise<{ data: User[]; total: number }> {
 		const {
-			search,
-			page = 1,
-			limit = 10,
-			sortBy = ['id'],
-			sortOrder = ['asc']
-		} = filterDto
-
+		  search,
+		  page = 1,
+		  limit = 10,
+		  sortBy = 'id', 
+		  sortOrder = 'asc' 
+		} = filterDto;
+	  
 		const where = search
-			? {
-					OR: [
-						{ name: { contains: search, mode: 'insensitive' } },
-						{ id: { equals: parseInt(search, 10) } },
-						{
-							description: {
-								contains: search,
-								mode: 'insensitive'
-							}
-						}
-					]
-				}
-			: {}
-
-		const skip = (page - 1) * limit
-		const take = limit
-
-		const orderBy = sortBy.map((field, index) => ({
-			[field]: sortOrder[index] || 'asc'
-		}))
-
-		const [data, total] = await this.prisma.$transaction([
+		  ? {
+			  OR: [
+				{ username: { contains: search, mode: 'insensitive' as const } }, 
+			  ]
+			}
+		  : {};
+	  
+		const skip = (parseInt(page.toString()) - 1) * limit;
+		const take = parseInt(limit.toString());
+	  
+		const sortByArray = Array.isArray(sortBy) ? sortBy : [sortBy];
+		const sortOrderArray = Array.isArray(sortOrder) ? sortOrder : [sortOrder];
+	  
+		const orderBy = sortByArray.map((field, index) => ({
+		  [field]: sortOrderArray[index] === 'desc' ? 'desc' : 'asc'
+		}));
+	  
+		try {
+		  const [data, total] = await this.prisma.$transaction([
 			this.prisma.user.findMany({
-				where,
-				skip,
-				take,
-				orderBy
+			  where,
+			  skip,
+			  take,
+			  orderBy
 			}),
 			this.prisma.user.count({ where })
-		])
-
-		return { data, total }
-	}
+		  ]);
+	  
+		  return { data, total };
+		} catch (error) {
+		  console.error(`Error fetching users: ${error}`, error);
+		  throw new Error(`Unable to fetch users: ${error}`);
+		}
+	  }
+	  
 
 	async findOne(id: number): Promise<User> {
 		const user = await this.prisma.user.findUnique({ where: { id } })

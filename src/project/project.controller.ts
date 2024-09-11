@@ -15,12 +15,14 @@ import {
 	ApiOperation,
 	ApiBody,
 	ApiParam,
-	ApiQuery
+	ApiQuery,
+	ApiBearerAuth
 } from '@nestjs/swagger'
 import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { Project, ProjectStatus } from '@prisma/client'
 
+@ApiBearerAuth('access-token')
 @ApiTags('projects')
 @Controller('projects')
 export class ProjectController {

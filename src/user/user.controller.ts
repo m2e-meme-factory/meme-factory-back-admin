@@ -7,15 +7,17 @@ import {
 	Param,
 	Delete,
 	Patch,
-	Query
+	Query,
+	ParseIntPipe
 } from '@nestjs/common'
 import { UserService } from './user.service'
 import { User } from '@prisma/client'
-import { ApiTags, ApiResponse, ApiQuery } from '@nestjs/swagger'
+import { ApiTags, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger'
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { FilterUserDto } from './dto/filter-user.dto'
 
+@ApiBearerAuth('access-token')
 @ApiTags('users')
 @Controller('users')
 export class UserController {
@@ -88,7 +90,7 @@ export class UserController {
 	})
 	@ApiResponse({ status: 404, description: 'User not found' })
 	@Auth('admin')
-	async findOne(@Param('id') id: number): Promise<User> {
+	async findOne(@Param('id', ParseIntPipe) id: number): Promise<User> {
 		return this.userService.findOne(id)
 	}
 

@@ -2,13 +2,14 @@
 import { Controller, Get, Post, Body, Param, Delete, Patch } from '@nestjs/common'
 import { ProgressProjectService } from './progress-project.service'
 import { ProgressProject } from '@prisma/client'
-import { ApiTags, ApiResponse } from '@nestjs/swagger'
+import { ApiTags, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import {
 	CreateProgressProjectDto,
 	UpdateProgressProjectDto
 } from './dto/progress-project.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 
+@ApiBearerAuth('access-token')
 @ApiTags('ProgressProjects')
 @Controller('progress-projects')
 export class ProgressProjectController {

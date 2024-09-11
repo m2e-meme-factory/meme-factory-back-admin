@@ -10,8 +10,10 @@ import {
 import { TransactionService } from './transaction.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
-import { ApiTags, ApiResponse, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiResponse, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { Auth } from 'src/auth/decorators/auth.decorator';
+
+@ApiBearerAuth('access-token')
 @ApiTags('transactions')
 @Controller('transactions')
 export class TransactionController {
