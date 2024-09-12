@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger'
+import { Decimal } from '@prisma/client/runtime/library'
 import { IsInt, IsPositive, IsDecimal, Min, Max } from 'class-validator'
 
 export class CreateTransactionDto {
@@ -23,5 +24,6 @@ export class CreateTransactionDto {
 	@IsPositive()
 	@Min(0)
 	@Max(1000000)
-	amount: number
+	amount: Decimal
 }
+

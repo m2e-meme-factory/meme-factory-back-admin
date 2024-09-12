@@ -5,15 +5,15 @@ import {
 	Post,
 	Body,
 	Param,
-	Delete,
 	Patch,
 	Query,
-	ParseIntPipe
+	ParseIntPipe,
+	Put
 } from '@nestjs/common'
 import { UserService } from './user.service'
-import { User } from '@prisma/client'
-import { ApiTags, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger'
-import { CreateUserDto, UpdateUserDto } from './dto/user.dto'
+import { User, UserAdmin, UserRole } from '@prisma/client'
+import { ApiTags, ApiResponse, ApiQuery, ApiBearerAuth, ApiBody, ApiParam, ApiOperation } from '@nestjs/swagger'
+import { CreateUserDto, UpdateUserAdminDto, UpdateUserDto, UpdateUserRoleDto } from './dto/user.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { FilterUserDto } from './dto/filter-user.dto'
 
@@ -109,15 +109,88 @@ export class UserController {
 		return this.userService.update(id, updateUserDto)
 	}
 
-	@Delete(':id')
+	@Put(':id/ban')
 	@ApiResponse({
 		status: 200,
-		description: 'The user has been successfully deleted.',
+		description: 'The user has been successfully banned.',
 		type: CreateUserDto
 	})
 	@ApiResponse({ status: 404, description: 'User not found' })
 	@Auth('admin')
-	async remove(@Param('id') id: number): Promise<User> {
-		return this.userService.remove(id)
+	async ban(@Param('id', ParseIntPipe) id: number): Promise<User> {
+		return this.userService.ban(id)
+	}
+	@Put(':id/unban')
+	@ApiResponse({
+		status: 200,
+		description: 'The user has been successfully unbanned.',
+		type: CreateUserDto
+	})
+	@ApiResponse({ status: 404, description: 'User not found' })
+	@Auth('admin')
+	async unban(@Param('id', ParseIntPipe) id: number): Promise<User> {
+		return this.userService.unban(id)
+	}
+
+	@Put(':id/role')
+	@ApiOperation({ summary: 'Изменить роль пользователя' })
+	@ApiParam({ name: 'id', description: 'ID пользователя' })
+	@ApiBody({ type: UpdateUserRoleDto })
+	@ApiResponse({
+		status: 200,
+		description: 'Роль пользователя успешно обновлена.',
+		schema: {
+			example: {
+				id: 1,
+				telegramId: '1234567',
+				username: '1234567',
+				role: UserRole.creator,
+				balance: 0,
+				isBaned: false,
+				isVerified: true,
+				createdAt: '2024-07-31T15:19:16.000Z',
+				inviterRefCode: null,
+				refCode: '1234567'
+			}
+		}
+	})
+	@ApiResponse({ status: 400, description: 'Неверные данные запроса.' })
+	@ApiResponse({ status: 404, description: 'Пользователь не найден.' })
+	@ApiResponse({ status: 403, description: 'Доступ запрещен.' })
+	@Auth('admin')
+	async updateUserRole(
+		@Param('id', ParseIntPipe) id: number,
+		@Body() updateUserRoleDto: UpdateUserRoleDto
+	): Promise<User> {
+		return this.userService.updateUserRole(id, updateUserRoleDto.role)
+	}
+	
+	@Put(':id/is-admin')
+	@ApiOperation({ summary: 'Изменить роль для админа' })
+	@ApiParam({ name: 'id', description: 'ID user admin' })
+	@ApiBody({ type: UpdateUserAdminDto })
+	@ApiResponse({
+		status: 200,
+		description: 'Роль админа успешно обновлена.',
+		schema: {
+			example: {
+				id: 1,
+				email: 'email@mail.ru',
+				password: 'hash',
+				isAdmin: true,
+				createdAt: '2024-07-31T15:19:16.000Z',
+				updatedAt: '2024-07-31T15:19:16.000Z',
+			}
+		}
+	})
+	@ApiResponse({ status: 400, description: 'Неверные данные запроса.' })
+	@ApiResponse({ status: 404, description: 'Пользователь не найден.' })
+	@ApiResponse({ status: 403, description: 'Доступ запрещен.' })
+	// @Auth('admin')
+	async updateUserAdmin(
+		@Param('id', ParseIntPipe) id: number,
+		@Body() updateUserAdminDto: UpdateUserAdminDto
+	): Promise<UserAdmin> {
+		return this.userService.updateUserAdmin(id, updateUserAdminDto.isAdmin)
 	}
 }

@@ -10,7 +10,7 @@ import {
 import { TransactionService } from './transaction.service';
 import { CreateTransactionDto } from './dto/create-transaction.dto';
 import { UpdateTransactionDto } from './dto/update-transaction.dto';
-import { ApiTags, ApiResponse, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiResponse, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 
 @ApiBearerAuth('access-token')
@@ -46,6 +46,7 @@ export class TransactionController {
   }
 
   @Patch(':id')
+  @ApiBody({type: UpdateTransactionDto})
   @ApiOperation({ summary: 'Обновить транзакцию' })
   @ApiResponse({ status: 200, description: 'Транзакция обновлена.', type: CreateTransactionDto })
   @ApiResponse({ status: 404, description: 'Транзакция не найдена.' })

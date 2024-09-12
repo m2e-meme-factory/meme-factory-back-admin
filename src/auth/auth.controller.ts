@@ -2,8 +2,9 @@ import { BadRequestException, Body, Controller, HttpCode, Post, UsePipes, Valida
 import { AuthService } from './auth.service';
 import { RefreshTokenDto } from './dto/refreshToken.dto';
 import { AuthDto } from './dto/auth.dto';
-import { ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('auth')
 @ApiBearerAuth('access-token')
 @Controller('auth')
 export class AuthController {

@@ -1,30 +1,29 @@
 // src/progress-project/progress-project.service.ts
 import { Injectable, NotFoundException } from '@nestjs/common'
 import { ProgressProject } from '@prisma/client'
-import {
-	UpdateProgressProjectDto
-} from './dto/progress-project.dto'
+import { UpdateProgressProjectDto } from './dto/progress-project.dto'
 import { PrismaService } from 'src/prisma/prisma.service'
 
 @Injectable()
 export class ProgressProjectService {
 	constructor(private readonly prisma: PrismaService) {}
 
-	async create(
-		data
-	): Promise<ProgressProject> {
+	async create(data): Promise<ProgressProject> {
 		return this.prisma.progressProject.create({
 			data
 		})
 	}
 
 	async findAll(): Promise<ProgressProject[]> {
-		return this.prisma.progressProject.findMany()
+		return this.prisma.progressProject.findMany({
+			include: { events: true }
+		})
 	}
 
 	async findOne(id: number): Promise<ProgressProject> {
 		const progressProject = await this.prisma.progressProject.findUnique({
-			where: { id }
+			where: { id },
+			include: {events: true}
 		})
 		if (!progressProject) {
 			throw new NotFoundException(
