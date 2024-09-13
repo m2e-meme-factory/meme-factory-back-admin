@@ -8,12 +8,14 @@ import {
 	Patch,
 	Query,
 	ParseIntPipe,
-	Put
+	Put,
+	UsePipes,
+	ValidationPipe
 } from '@nestjs/common'
 import { UserService } from './user.service'
 import { User, UserAdmin, UserRole } from '@prisma/client'
-import { ApiTags, ApiResponse, ApiQuery, ApiBearerAuth, ApiBody, ApiParam, ApiOperation } from '@nestjs/swagger'
-import { CreateUserDto, UpdateUserAdminDto, UpdateUserDto, UpdateUserRoleDto } from './dto/user.dto'
+import { ApiTags, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiOperation } from '@nestjs/swagger'
+import { CreateUserDto, GetUserDto, UpdateUserAdminDto, UpdateUserDto, UpdateUserRoleDto, UserPaginationDto } from './dto/user.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { FilterUserDto } from './dto/filter-user.dto'
 
@@ -39,46 +41,12 @@ export class UserController {
 	@ApiResponse({
 		status: 200,
 		description: 'Return all users with pagination, sorting, and filtering',
-		type: [UpdateUserDto]
+		type: [UserPaginationDto]
 	})
 	@Auth('admin')
-	@ApiQuery({
-		name: 'search',
-		required: false,
-		type: String,
-		description: 'Search users by name, description or ID'
-	})
-	@ApiQuery({
-		name: 'page',
-		required: false,
-		type: Number,
-		description: 'Page number for pagination',
-		example: 1
-	})
-	@ApiQuery({
-		name: 'limit',
-		required: false,
-		type: Number,
-		description: 'Limit of users per page',
-		example: 10
-	})
-	@ApiQuery({
-		name: 'sortBy',
-		required: false,
-		description: 'Fields to sort by, can be an array of field names',
-		isArray: true,
-		example: ['id', 'name']
-	})
-	@ApiQuery({
-		name: 'sortOrder',
-		required: false,
-		enum: ['asc', 'desc'],
-		description: 'Sort order: asc or desc',
-		example: 'asc'
-	})
 	async findAll(
 		@Query() filterDto: FilterUserDto
-	): Promise<{ data: User[]; total: number }> {
+	): Promise<{ data: GetUserDto[]; total: number }> {
 		return this.userService.findAll(filterDto)
 	}
 
@@ -102,6 +70,7 @@ export class UserController {
 	})
 	@ApiResponse({ status: 404, description: 'User not found' })
 	@Auth('admin')
+	@UsePipes(new ValidationPipe({transform: true}))
 	async update(
 		@Param('id') id: number,
 		@Body() updateUserDto: UpdateUserDto

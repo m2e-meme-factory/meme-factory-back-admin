@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common'
 import { User, UserAdmin, UserRole } from '@prisma/client'
 import { PrismaService } from 'src/prisma/prisma.service'
-import { CreateUserDto, UpdateUserDto } from './dto/user.dto'
+import { CreateUserDto, GetUserDto, UpdateUserDto } from './dto/user.dto'
 import { FilterUserDto } from './dto/filter-user.dto'
 
 @Injectable()
@@ -19,37 +19,47 @@ export class UserService {
 
 	async findAll(
 		filterDto: FilterUserDto
-	): Promise<{ data: User[]; total: number }> {
+	): Promise<{ data: GetUserDto[]; total: number }> {
 		const {
 			search,
 			page = 1,
 			limit = 10,
 			sortBy = 'id',
-			sortOrder = 'asc'
+			sortOrder = 'asc',
+			isBanned,
+			isVerified,
+			refCode,
+			role
 		} = filterDto
 
-		const where = search
-			? {
-					OR: [
-						{
-							username: {
-								contains: search,
-								mode: 'insensitive' as const
-							}
-						},
-						{
-							MetaTag: {
-								some: {
-									tag: {
-										contains: search,
-										mode: 'insensitive' as const
-									}
+		const where: any = {
+			...(search && {
+				OR: [
+					{
+						username: {
+							contains: search,
+							mode: 'insensitive' as const
+						}
+					},
+					{
+						MetaTag: {
+							some: {
+								tag: {
+									contains: search,
+									mode: 'insensitive' as const
 								}
 							}
 						}
-					]
-				}
-			: {}
+					}
+				]
+			}),
+			...(isBanned !== undefined && { isBanned }),
+			...(isVerified !== undefined && { isVerified }),
+			...(refCode && {
+				refCode: { contains: refCode, mode: 'insensitive' }
+			}),
+			...(role && { role })
+		}
 
 		const skip = (parseInt(page.toString()) - 1) * limit
 		const take = parseInt(limit.toString())
@@ -101,16 +111,20 @@ export class UserService {
 	}
 
 	async ban(id: number): Promise<User> {
-
-		return this.prisma.user.update({ where: { id }, data: {
-			isBaned: true
-		} })
+		return this.prisma.user.update({
+			where: { id },
+			data: {
+				isBaned: true
+			}
+		})
 	}
 	async unban(id: number): Promise<User> {
-
-		return this.prisma.user.update({ where: { id }, data: {
-			isBaned: false
-		} })
+		return this.prisma.user.update({
+			where: { id },
+			data: {
+				isBaned: false
+			}
+		})
 	}
 
 	async updateUserRole(id: number, role: UserRole): Promise<User> {

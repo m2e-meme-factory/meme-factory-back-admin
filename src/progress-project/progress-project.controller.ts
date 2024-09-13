@@ -1,13 +1,24 @@
 // src/progress-project/progress-project.controller.ts
-import { Controller, Get, Post, Body, Param, Delete, Patch } from '@nestjs/common'
+import {
+	Controller,
+	Get,
+	Post,
+	Body,
+	Param,
+	Delete,
+	Patch,
+	Query
+} from '@nestjs/common'
 import { ProgressProjectService } from './progress-project.service'
 import { ProgressProject } from '@prisma/client'
 import { ApiTags, ApiResponse, ApiBearerAuth } from '@nestjs/swagger'
 import {
 	CreateProgressProjectDto,
+	GetProgressProjectDto,
 	UpdateProgressProjectDto
 } from './dto/progress-project.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
+import { FilterProgressProjectDto } from './dto/filter-progress-project.dto'
 
 @ApiBearerAuth('access-token')
 @ApiTags('ProgressProjects')
@@ -34,18 +45,20 @@ export class ProgressProjectController {
 	@ApiResponse({
 		status: 200,
 		description: 'Получение всех прогрессов проектов',
-		type: [CreateProgressProjectDto]
+		type: [GetProgressProjectDto]
 	})
 	@Auth('admin')
-	findAll(): Promise<ProgressProject[]> {
-		return this.progressProjectService.findAll()
+	findAll(
+		@Query() filterProgressProjectDto: FilterProgressProjectDto
+	): Promise<{ total: number; progressProjects: ProgressProject[] }> {
+		return this.progressProjectService.findAll(filterProgressProjectDto)
 	}
 
 	@Get(':id')
 	@ApiResponse({
 		status: 200,
 		description: 'Получение прогресса проекта по ID',
-		type: CreateProgressProjectDto
+		type: GetProgressProjectDto
 	})
 	@ApiResponse({ status: 404, description: 'Прогресс проекта не найден' })
 	@Auth('admin')
@@ -57,7 +70,7 @@ export class ProgressProjectController {
 	@ApiResponse({
 		status: 200,
 		description: 'Обновление прогресса проекта',
-		type: CreateProgressProjectDto
+		type: UpdateProgressProjectDto
 	})
 	@ApiResponse({ status: 404, description: 'Прогресс проекта не найден' })
 	@Auth('admin')
@@ -72,7 +85,6 @@ export class ProgressProjectController {
 	@ApiResponse({
 		status: 200,
 		description: 'Удаление прогресса проекта',
-		type: CreateProgressProjectDto
 	})
 	@ApiResponse({ status: 404, description: 'Прогресс проекта не найден' })
 	@Auth('admin')
