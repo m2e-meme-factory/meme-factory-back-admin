@@ -1,8 +1,9 @@
 import { PartialType } from '@nestjs/mapped-types'
 import { CreateTransactionDto } from './create-transaction.dto'
 import { ApiProperty } from '@nestjs/swagger'
-import { IsDecimal, IsNumber, IsOptional } from 'class-validator'
+import { IsDecimal, IsEnum, IsNumber, IsOptional } from 'class-validator'
 import { Decimal } from '@prisma/client/runtime/library'
+import { TransactionType } from '@prisma/client'
 
 export class UpdateTransactionDto extends PartialType(CreateTransactionDto) {
 	@ApiProperty({ example: 1, required: false, description: 'ID проекта' })
@@ -42,4 +43,12 @@ export class UpdateTransactionDto extends PartialType(CreateTransactionDto) {
 	@IsOptional()
 	@IsDecimal()
 	amount?: Decimal
+
+	@ApiProperty({
+		example: "SYSTEM",
+		description: 'Тип транзакции',
+		type: 'string'
+	})
+	@IsEnum({TransactionType})
+	type: TransactionType
 }
