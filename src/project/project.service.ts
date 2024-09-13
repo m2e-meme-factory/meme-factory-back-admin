@@ -6,6 +6,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto'
 import { Project } from '@prisma/client'
+import { FilterProjectDto } from './dto/filter-project.dto'
 
 @Injectable()
 export class ProjectService {
@@ -59,87 +60,87 @@ export class ProjectService {
 			)
 		}
 	}
-  
-	async findAll(query: {
-		search?: string
-		sortBy?: string[]
-		sortOrder?: ('asc' | 'desc')[]
-		page?: number
-		pageSize?: number
-		filters?: any
-	}): Promise<{
-		data: Project[]
-		total: number
-		page: number
-		pageSize: number
-	}> {
+
+	async findAll(filterProjectDto: FilterProjectDto) {
 		const {
-			search = '',
+			authorId,
+			title,
+			description,
+			tags,
+			category,
+			status,
 			sortBy = ['id'],
-			sortOrder = ['asc'],
+			sortOrder,
 			page = 1,
-			pageSize = 10,
-			filters = {}
-		} = query
+			limit = 10
+		} = filterProjectDto
 
-		try {
-			const where = {
-				AND: [
-					search
-						? {
-								OR: [
-									{
-										title: {
-											contains: search,
-											mode: 'insensitive'
-										}
-									},
-									{
-										description: {
-											contains: search,
-											mode: 'insensitive'
-										}
-									}
-								]
-							}
-						: {},
-					filters
-				]
-			}
+		const where: any = {}
 
-			const orderBy = sortBy.map((field, index) => ({
-				[field]: sortOrder[index] || 'asc'
-			}))
+		if (authorId !== undefined) {
+			where.authorId = authorId
+		}
 
-			const projects = await this.prisma.project.findMany({
+		if (title) {
+			where.title = { contains: title, mode: 'insensitive' }
+		}
+
+		if (description) {
+			where.description = { contains: description, mode: 'insensitive' }
+		}
+
+		if (tags) {
+			where.tags = { hasSome: tags }
+		}
+
+		if (category) {
+			where.category = category
+		}
+
+		if (status) {
+			where.status = status
+		}
+
+		const sortByArray = Array.isArray(sortBy) ? sortBy : [sortBy]
+		const sortOrderArray = Array.isArray(sortOrder)
+			? sortOrder
+			: [sortOrder]
+
+		const orderBy = sortByArray.map((field, index) => ({
+			[field]: sortOrderArray[index] || 'asc'
+		}))
+
+		const [projects, total] = await Promise.all([
+			this.prisma.project.findMany({
 				where,
 				orderBy,
-				skip: (page - 1) * pageSize,
-				take: pageSize,
+				skip: (page - 1) * limit,
+				take: limit,
 				include: {
-					tasks: true
+					tasks: {
+						include: {
+							task: true
+						}
+					}
 				}
-			})
+			}),
+			this.prisma.project.count({ where })
+		])
 
-			const total = await this.prisma.project.count({ where })
-
-			return {
-				data: projects,
-				total,
-				page,
-				pageSize
-			}
-		} catch (error) {
-			throw new InternalServerErrorException(
-				`Ошибка при получении проектов: ${error.message}`
-			)
+		return {
+			total,
+			projects
 		}
 	}
 
 	async findOne(id: number) {
 		return this.prisma.project.findUnique({
 			where: { id },
-			include: {tasks: true}
+			include: {
+				tasks: {
+					include: { task: true }
+				}
+			}
 		})
 	}
 

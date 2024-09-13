@@ -6,7 +6,9 @@ import {
 	Param,
 	Delete,
 	Patch,
-	Query
+	Query,
+	ValidationPipe,
+	UsePipes
 } from '@nestjs/common'
 import { ProjectService } from './project.service'
 import {
@@ -15,12 +17,12 @@ import {
 	ApiOperation,
 	ApiBody,
 	ApiParam,
-	ApiQuery,
-	ApiBearerAuth
+	ApiBearerAuth,
 } from '@nestjs/swagger'
-import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto'
+import { CreateProjectDto, ProjectWithTasksDto, UpdateProjectDto } from './dto/project.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { Project, ProjectStatus } from '@prisma/client'
+import { FilterProjectDto, PaginatedProjectResponseDto } from './dto/filter-project.dto'
 
 @ApiBearerAuth('access-token')
 @ApiTags('projects')
@@ -58,72 +60,15 @@ export class ProjectController {
 	}
 
 	@Get()
-	@ApiOperation({
-		summary: 'Получить все проекты с фильтрацией, сортировкой и пагинацией'
-	})
+	@ApiOperation({ summary: 'Получить все проекты' })
 	@ApiResponse({
 		status: 200,
 		description: 'Список проектов.',
-		type: [CreateProjectDto]
+		type: PaginatedProjectResponseDto
 	})
-	@Auth('admin')
-	@ApiQuery({
-		name: 'search',
-		required: false,
-		description: 'Поиск по названию и описанию'
-	})
-	@ApiQuery({
-		name: 'sortBy',
-		required: false,
-		description: 'Поля для сортировки',
-		type: [String]
-	})
-	@ApiQuery({
-		name: 'sortOrder',
-		required: false,
-		description: 'Порядок сортировки',
-		enum: ['asc', 'desc'],
-		isArray: true
-	})
-	@ApiQuery({
-		name: 'page',
-		required: false,
-		description: 'Номер страницы',
-		type: Number
-	})
-	@ApiQuery({
-		name: 'pageSize',
-		required: false,
-		description: 'Количество элементов на странице',
-		type: Number
-	})
-	@ApiQuery({
-		name: 'filters',
-		required: false,
-		description: 'Фильтры для поиска',
-		type: Object
-	})
-	async findAll(
-		@Query('search') search?: string,
-		@Query('sortBy') sortBy?: string[],
-		@Query('sortOrder') sortOrder?: ('asc' | 'desc')[],
-		@Query('page') page?: number,
-		@Query('pageSize') pageSize?: number,
-		@Query('filters') filters?: any
-	): Promise<{
-		data: Project[]
-		total: number
-		page: number
-		pageSize: number
-	}> {
-		return this.projectService.findAll({
-			search,
-			sortBy,
-			sortOrder,
-			page,
-			pageSize,
-			filters
-		})
+	@UsePipes(new ValidationPipe({ transform: true }))
+	async findAll(@Query() filterProjectDto: FilterProjectDto) {
+		return this.projectService.findAll(filterProjectDto)
 	}
 
 	@Get(':id')
@@ -131,7 +76,7 @@ export class ProjectController {
 	@ApiResponse({
 		status: 200,
 		description: 'Найден проект.',
-		type: CreateProjectDto
+		type: ProjectWithTasksDto
 	})
 	@ApiResponse({ status: 404, description: 'Проект не найден.' })
 	@Auth('admin')
