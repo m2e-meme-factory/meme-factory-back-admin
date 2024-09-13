@@ -115,7 +115,10 @@ export class ProjectService {
 				where,
 				orderBy,
 				skip: (page - 1) * pageSize,
-				take: pageSize
+				take: pageSize,
+				include: {
+					tasks: true
+				}
 			})
 
 			const total = await this.prisma.project.count({ where })
@@ -135,7 +138,8 @@ export class ProjectService {
 
 	async findOne(id: number) {
 		return this.prisma.project.findUnique({
-			where: { id }
+			where: { id },
+			include: {tasks: true}
 		})
 	}
 
