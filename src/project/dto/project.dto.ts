@@ -2,6 +2,7 @@ import { ApiProperty, OmitType } from '@nestjs/swagger'
 import { ProjectStatus, ProjectTask } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
 import {
+	ArrayMinSize,
 	IsArray,
 	IsDecimal,
 	IsInt,
@@ -10,6 +11,7 @@ import {
 	IsOptional,
 	IsString
 } from 'class-validator'
+import { Transform } from 'class-transformer'
 
 export class CreateTaskDto {
 	@IsOptional()
@@ -131,11 +133,15 @@ export class CreateProjectDto {
 	@IsArray()
 	@IsOptional()
 	@IsString({ each: true })
+	@ArrayMinSize(1)
+	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
 	files?: string[]
 
 	@ApiProperty({ example: ['tag1', 'tag2'] })
 	@IsArray()
 	@IsString({ each: true })
+	@ArrayMinSize(1)
+	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
 	tags: string[]
 
 	@ApiProperty({ example: 'Category Name' })
@@ -146,6 +152,8 @@ export class CreateProjectDto {
 		type: [CreateTaskDto]
 	})
 	@IsArray()
+	@ArrayMinSize(1)
+	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
 	subtasks: CreateTaskDto[]
 }
 
@@ -155,6 +163,8 @@ export class UpdateProjectDto extends OmitType(CreateProjectDto, [
 	@IsArray()
 	@ApiProperty({ example: [1, 2, 3, 4, 5] })
 	@IsOptional()
+	@ArrayMinSize(1)
+	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
 	deletedTasks?: number[]
 }
 

@@ -7,7 +7,9 @@ import {
 	Param,
 	Delete,
 	Patch,
-	Query
+	Query,
+	ValidationPipe,
+	UsePipes
 } from '@nestjs/common'
 import { ProgressProjectService } from './progress-project.service'
 import { ProgressProject } from '@prisma/client'
@@ -48,6 +50,7 @@ export class ProgressProjectController {
 		type: [GetProgressProjectDto]
 	})
 	@Auth('admin')
+	@UsePipes(new ValidationPipe({ transform: true }))
 	findAll(
 		@Query() filterProgressProjectDto: FilterProgressProjectDto
 	): Promise<{ total: number; progressProjects: ProgressProject[] }> {

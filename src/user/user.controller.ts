@@ -44,6 +44,7 @@ export class UserController {
 		type: [UserPaginationDto]
 	})
 	@Auth('admin')
+	@UsePipes(new ValidationPipe({ transform: true }))
 	async findAll(
 		@Query() filterDto: FilterUserDto
 	): Promise<{ data: GetUserDto[]; total: number }> {

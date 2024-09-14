@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { ProjectStatus } from '@prisma/client'
-import { IsOptional, IsString, IsArray, IsEnum, IsInt } from 'class-validator'
+import { IsOptional, IsString, IsArray, IsEnum, IsInt, ArrayMinSize } from 'class-validator'
 import { ProjectWithTasksDto } from './project.dto'
 import { Transform } from 'class-transformer'
 
@@ -25,6 +25,8 @@ export class FilterProjectDto {
 	@IsOptional()
 	@IsArray()
 	@IsString({ each: true })
+	@ArrayMinSize(1)
+	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
 	tags?: string[]
 
 	@ApiProperty({ example: 'Category Name', required: false })
@@ -52,11 +54,15 @@ export class FilterProjectDto {
 	@ApiProperty({ example: ['id', 'title'], required: false })
 	@IsOptional()
 	@IsArray()
+	@ArrayMinSize(1)
+	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
 	sortBy?: string[]
 
 	@ApiProperty({ example: ['asc', 'desc'], required: false })
 	@IsOptional()
 	@IsArray()
+	@ArrayMinSize(1)
+	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
 	sortOrder?: string[]
 }
 

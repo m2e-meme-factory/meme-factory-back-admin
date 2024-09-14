@@ -6,7 +6,8 @@ import {
 	IsEnum,
 	IsDecimal,
 	IsArray,
-	IsString
+	IsString,
+	ArrayMinSize
 } from 'class-validator'
 import { Transform } from 'class-transformer'
 import { Decimal } from '@prisma/client/runtime/library'
@@ -75,6 +76,8 @@ export class FilterTransactionDto {
 	@IsOptional()
 	@IsArray()
 	@IsString({ each: true })
+	@ArrayMinSize(1)
+	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
 	sortBy?: string[]
 
 	@ApiPropertyOptional({
@@ -84,6 +87,8 @@ export class FilterTransactionDto {
 	@IsOptional()
 	@IsArray()
 	@IsString({ each: true })
+	@ArrayMinSize(1)
+	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
 	sortOrder?: ('asc' | 'desc')[]
 
     @ApiPropertyOptional({ example: 1, description: 'Номер страницы для пагинации' })
