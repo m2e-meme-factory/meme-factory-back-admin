@@ -1,7 +1,15 @@
 import { ApiProperty } from '@nestjs/swagger'
 import { TransactionType } from '@prisma/client'
 import { Decimal } from '@prisma/client/runtime/library'
-import { IsInt, IsPositive, IsDecimal, Min, Max, IsDate, IsEnum } from 'class-validator'
+import {
+	IsInt,
+	IsPositive,
+	IsDecimal,
+	Min,
+	Max,
+	IsDate,
+	IsEnum
+} from 'class-validator'
 
 export class CreateTransactionDto {
 	@ApiProperty({ example: 1, description: 'ID проекта' })
@@ -28,8 +36,7 @@ export class CreateTransactionDto {
 
 	@ApiProperty({
 		example: 500,
-		description: 'Сумма транзакции',
-		type: 'string'
+		description: 'Сумма транзакции'
 	})
 	@IsDecimal()
 	@IsPositive()
@@ -74,28 +81,27 @@ export class TransactionDto {
 	@Max(1000000)
 	amount: Decimal
 
- 
 	@IsDate()
 	@ApiProperty({
-		example: "2024-09-12T18:41:27.094Z",
+		example: '2024-09-12T18:41:27.094Z',
 		description: 'Дата создания',
 		type: 'date'
 	})
 	createdAt: Date
 
 	@ApiProperty({
-		example: "SYSTEM",
+		example: 'SYSTEM',
 		description: 'Тип транзакции',
 		type: 'string'
 	})
-	@IsEnum({TransactionType})
+	@IsEnum({ TransactionType })
 	type: TransactionType
 }
 
 export class PaginatedTransactionResponseDto {
 	@ApiProperty({ example: 100, description: 'Общее количество транзакций' })
-	total: number;
+	total: number
 
 	@ApiProperty({ type: [TransactionDto], description: 'Список транзакций' })
-	transactions: TransactionDto[];
+	transactions: TransactionDto[]
 }
