@@ -13,7 +13,7 @@ import { UserRole } from '@prisma/client'
 
 export class FilterUserDto {
 	@ApiPropertyOptional({
-		description: 'Search term to filter by name or tag'
+		description: 'Search term to filter by username or tag'
 	})
 	@IsOptional()
 	@IsString()
@@ -39,7 +39,6 @@ export class FilterUserDto {
 
 	@ApiPropertyOptional({
 		description: 'Fields to sort by',
-		example: '[name]'
 	})
 	@IsOptional()
 	@IsArray()
