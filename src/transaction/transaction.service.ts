@@ -1,17 +1,34 @@
-import { Injectable } from '@nestjs/common'
+import {
+	Injectable,
+	NotFoundException,
+	InternalServerErrorException,
+	BadRequestException
+} from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { UpdateTransactionDto } from './dto/update-transaction.dto'
 import { FilterTransactionDto } from './dto/filters-transaction.dto'
+import { Prisma } from '@prisma/client'
 
 @Injectable()
 export class TransactionService {
 	constructor(private readonly prisma: PrismaService) {}
 
 	async create(createTransactionDto: CreateTransactionDto) {
-		return this.prisma.transaction.create({
-			data: createTransactionDto
-		})
+		try {
+			return await this.prisma.transaction.create({
+				data: createTransactionDto
+			})
+		} catch (error) {
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2002') {
+					throw new BadRequestException(
+						'Transaction with this data already exists'
+					)
+				}
+			}
+			throw new InternalServerErrorException('Error creating transaction')
+		}
 	}
 
 	async findAll(filterTransactionDto: FilterTransactionDto) {
@@ -66,42 +83,86 @@ export class TransactionService {
 			? sortOrder
 			: [sortOrder]
 
-		const orderBy = sortByArray?.map((field, index) => ({
+		const orderBy = sortByArray.map((field, index) => ({
 			[field]: sortOrderArray?.[index] || 'asc'
 		}))
 
-		const [transactions, total] = await Promise.all([
-			this.prisma.transaction.findMany({
-				where,
-				orderBy,
-				skip: (page - 1) * limit,
-				take: limit
-			}),
-			this.prisma.transaction.count({ where })
-		])
+		try {
+			const [transactions, total] = await Promise.all([
+				this.prisma.transaction.findMany({
+					where,
+					orderBy,
+					skip: (page - 1) * limit,
+					take: limit
+				}),
+				this.prisma.transaction.count({ where })
+			])
 
-		return {
-			total,
-			transactions
+			return {
+				total,
+				transactions
+			}
+		} catch (error) {
+			throw new InternalServerErrorException(
+				'Error fetching transactions'
+			)
 		}
 	}
 
 	async findOne(id: number) {
-		return this.prisma.transaction.findUnique({
-			where: { id }
-		})
+		try {
+			const transaction = await this.prisma.transaction.findUnique({
+				where: { id }
+			})
+			if (!transaction) {
+				throw new NotFoundException(
+					`Transaction with ID ${id} not found`
+				)
+			}
+			return transaction
+		} catch (error) {
+			throw new InternalServerErrorException(
+				`Error fetching transaction: ${error}`
+			)
+		}
 	}
 
 	async update(id: number, updateTransactionDto: UpdateTransactionDto) {
-		return this.prisma.transaction.update({
-			where: { id },
-			data: updateTransactionDto
-		})
+		try {
+			return await this.prisma.transaction.update({
+				where: { id },
+				data: updateTransactionDto
+			})
+		} catch (error) {
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2025') {
+					throw new NotFoundException(
+						`Transaction with ID ${id} not found`
+					)
+				}
+			}
+			throw new InternalServerErrorException(
+				`Error updating transaction: ${error}`
+			)
+		}
 	}
 
 	async remove(id: number) {
-		return this.prisma.transaction.delete({
-			where: { id }
-		})
+		try {
+			return await this.prisma.transaction.delete({
+				where: { id }
+			})
+		} catch (error) {
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2025') {
+					throw new NotFoundException(
+						`Transaction with ID ${id} not found`
+					)
+				}
+			}
+			throw new InternalServerErrorException(
+				`Error deleting transaction: ${error}`
+			)
+		}
 	}
 }

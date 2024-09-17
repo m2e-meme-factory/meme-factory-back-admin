@@ -1,6 +1,12 @@
-import { Injectable, InternalServerErrorException } from '@nestjs/common'
+import {
+	Injectable,
+	InternalServerErrorException,
+	BadRequestException,
+	NotFoundException,
+	ConflictException
+} from '@nestjs/common'
 import { CreateAutoTaskDto, UpdateAutoTaskDto } from './dto/auto-task.dto'
-import { AutoTask, AutoTaskApplication } from '@prisma/client'
+import { AutoTask, AutoTaskApplication, Prisma } from '@prisma/client'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { FilterAutoTaskDto } from './dto/fielter-auto-task.dto'
 
@@ -11,46 +17,50 @@ export class AutoTaskService {
 	async getAutoTaskApplications(
 		userId?: number,
 		taskId?: number,
-		page: number = 1, // Установка значения по умолчанию для страницы
-		limit: number = 10 // Установка значения по умолчанию для лимита
+		page: number = 1,
+		limit: number = 10
 	): Promise<{ applications: AutoTaskApplication[]; total: number }> {
 		try {
 			const whereClause: any = {}
 
 			if (userId) {
+				if (typeof userId !== 'number') {
+					throw new BadRequestException('userId должен быть числом.')
+				}
 				whereClause.userId = userId
 			}
 
 			if (taskId) {
+				if (typeof taskId !== 'number') {
+					throw new BadRequestException('taskId должен быть числом.')
+				}
 				whereClause.taskId = taskId
 			}
 
-			// Рассчитываем количество пропускаемых записей
-			const skip = (page - 1) * limit;
+			const skip = (page - 1) * limit
 
 			const [applications, total] = await Promise.all([
 				this.prisma.autoTaskApplication.findMany({
 					where: whereClause,
-					take: limit, // Ограничение по количеству возвращаемых записей
-					skip, // Пропускаем записи на основе текущей страницы
+					take: limit,
+					skip,
 					include: {
 						task: true,
 						user: true
 					}
 				}),
 				this.prisma.autoTaskApplication.count({
-					where: whereClause // Получаем общее количество записей
+					where: whereClause
 				})
-			]);
+			])
 
-			return { applications, total }; // Возвращаем массив записей и общее количество
+			return { applications, total }
 		} catch (error) {
 			throw new InternalServerErrorException(
-				`Error fetching auto task applications: ${error}`
-			);
+				`Error fetching auto task applications: ${error.message}`
+			)
 		}
 	}
-
 
 	async getAutoTasks(
 		filterAutoTaskDto: FilterAutoTaskDto
@@ -70,7 +80,6 @@ export class AutoTaskService {
 			} = filterAutoTaskDto
 
 			const whereClause: any = {}
-			console.log(isIntegrated)
 			if (title) {
 				whereClause.title = { contains: title, mode: 'insensitive' }
 			}
@@ -83,17 +92,21 @@ export class AutoTaskService {
 			}
 
 			if (rewardFrom !== undefined) {
-				whereClause.reward = {
-					...whereClause.reward,
-					gte: rewardFrom
+				if (typeof rewardFrom !== 'number') {
+					throw new BadRequestException(
+						'rewardFrom должен быть числом.'
+					)
 				}
+				whereClause.reward = { ...whereClause.reward, gte: rewardFrom }
 			}
 
 			if (rewardTo !== undefined) {
-				whereClause.reward = {
-					...whereClause.reward,
-					lte: rewardTo
+				if (typeof rewardTo !== 'number') {
+					throw new BadRequestException(
+						'rewardTo должен быть числом.'
+					)
 				}
+				whereClause.reward = { ...whereClause.reward, lte: rewardTo }
 			}
 
 			if (url) {
@@ -109,30 +122,24 @@ export class AutoTaskService {
 				? sortOrder
 				: [sortOrder]
 
-			const orderBy = sortByArray?.map((field, index) => ({
-				[field]: sortOrderArray?.[index] || 'asc'
+			const orderBy = sortByArray.map((field, index) => ({
+				[field]: sortOrderArray[index] || 'asc'
 			}))
 
-			const [total, tasks] = await this.prisma.autoTask
-				.findMany({
+			const [total, tasks] = await Promise.all([
+				this.prisma.autoTask.count({ where: whereClause }),
+				this.prisma.autoTask.findMany({
 					where: whereClause,
 					take: limit,
 					skip: (page - 1) * limit,
 					orderBy
 				})
-				.then(tasks =>
-					Promise.all([
-						this.prisma.autoTask.count({
-							where: whereClause
-						}),
-						tasks
-					])
-				)
+			])
 
 			return { total, tasks }
 		} catch (error) {
 			throw new InternalServerErrorException(
-				`Error fetching auto tasks: ${error}`
+				`Error fetching auto tasks: ${error.message}`
 			)
 		}
 	}
@@ -140,6 +147,12 @@ export class AutoTaskService {
 	async createTask(dto: CreateAutoTaskDto): Promise<AutoTask> {
 		try {
 			const { title, description, reward, url, isIntegrated } = dto
+
+			if (!title || !description || reward === undefined) {
+				throw new BadRequestException(
+					'Title, description и reward обязательны.'
+				)
+			}
 
 			const task = await this.prisma.autoTask.create({
 				data: {
@@ -152,8 +165,16 @@ export class AutoTaskService {
 			})
 			return task
 		} catch (error) {
+			if (
+				error instanceof Prisma.PrismaClientKnownRequestError &&
+				error.code === 'P2002'
+			) {
+				throw new ConflictException(
+					'AutoTask с таким уникальным значением уже существует.'
+				)
+			}
 			throw new InternalServerErrorException(
-				`Error creating task: ${error}`
+				`Error creating task: ${error.message}`
 			)
 		}
 	}
@@ -164,6 +185,19 @@ export class AutoTaskService {
 	): Promise<AutoTask> {
 		try {
 			const { title, description, reward, url, isIntegrated } = dto
+
+			if (typeof taskId !== 'number') {
+				throw new BadRequestException('taskId должен быть числом.')
+			}
+
+			const existingTask = await this.prisma.autoTask.findUnique({
+				where: { id: taskId }
+			})
+			if (!existingTask) {
+				throw new NotFoundException(
+					`AutoTask с ID ${taskId} не найден.`
+				)
+			}
 
 			const task = await this.prisma.autoTask.update({
 				where: { id: taskId },
@@ -177,8 +211,16 @@ export class AutoTaskService {
 			})
 			return task
 		} catch (error) {
+			if (
+				error instanceof Prisma.PrismaClientKnownRequestError &&
+				error.code === 'P2002'
+			) {
+				throw new ConflictException(
+					'AutoTask с таким уникальным значением уже существует.'
+				)
+			}
 			throw new InternalServerErrorException(
-				`Error creating task: ${error}`
+				`Error updating task: ${error.message}`
 			)
 		}
 	}
