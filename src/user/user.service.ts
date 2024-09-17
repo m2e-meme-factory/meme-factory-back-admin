@@ -1,20 +1,29 @@
-// src/user/user.service.ts
 import {
 	Injectable,
 	InternalServerErrorException,
-	NotFoundException
-} from '@nestjs/common'
-import { User, UserAdmin, UserRole } from '@prisma/client'
-import { PrismaService } from 'src/prisma/prisma.service'
-import { CreateUserDto, GetUserDto, UpdateUserDto } from './dto/user.dto'
-import { FilterUserDto } from './dto/filter-user.dto'
+	NotFoundException,
+	ConflictException
+} from '@nestjs/common';
+import { Prisma, User, UserAdmin, UserRole } from '@prisma/client';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { CreateUserDto, GetUserDto, UpdateUserDto } from './dto/user.dto';
+import { FilterUserDto } from './dto/filter-user.dto';
 
 @Injectable()
 export class UserService {
 	constructor(private readonly prisma: PrismaService) {}
 
 	async create(data: CreateUserDto): Promise<User> {
-		return this.prisma.user.create({ data })
+		try {
+			return await this.prisma.user.create({ data });
+		} catch (error) {
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2002') {
+					throw new ConflictException('User with this data already exists');
+				}
+			}
+			throw new InternalServerErrorException('Error creating user');
+		}
 	}
 
 	async findAll(
@@ -30,7 +39,7 @@ export class UserService {
 			isVerified,
 			refCode,
 			role
-		} = filterDto
+		} = filterDto;
 
 		const where: any = {
 			...(search && {
@@ -59,19 +68,19 @@ export class UserService {
 				refCode: { contains: refCode, mode: 'insensitive' }
 			}),
 			...(role && { role })
-		}
+		};
 
-		const skip = (parseInt(page.toString()) - 1) * limit
-		const take = parseInt(limit.toString())
+		const skip = (parseInt(page.toString()) - 1) * limit;
+		const take = parseInt(limit.toString());
 
-		const sortByArray = Array.isArray(sortBy) ? sortBy : [sortBy]
+		const sortByArray = Array.isArray(sortBy) ? sortBy : [sortBy];
 		const sortOrderArray = Array.isArray(sortOrder)
 			? sortOrder
-			: [sortOrder]
+			: [sortOrder];
 
 		const orderBy = sortByArray.map((field, index) => ({
 			[field]: sortOrderArray[index] === 'desc' ? 'desc' : 'asc'
-		}))
+		}));
 
 		try {
 			const [data, total] = await this.prisma.$transaction([
@@ -86,45 +95,77 @@ export class UserService {
 					}
 				}),
 				this.prisma.user.count({ where })
-			])
+			]);
 
-			return { data, total }
+			return { data, total };
 		} catch (error) {
-			console.error(`Error fetching users: ${error}`, error)
-			throw new Error(`Unable to fetch users: ${error}`)
+			console.error(`Error fetching users: ${error}`);
+			throw new InternalServerErrorException('Unable to fetch users');
 		}
 	}
 
 	async findOne(id: number): Promise<User> {
-		const user = await this.prisma.user.findUnique({
-			where: { id },
-			include: { userInfo: true }
-		})
-		if (!user) {
-			throw new NotFoundException(`User with ID ${id} not found`)
+		try {
+			const user = await this.prisma.user.findUnique({
+				where: { id },
+				include: { userInfo: true }
+			});
+			if (!user) {
+				throw new NotFoundException(`User with ID ${id} not found`);
+			}
+			return user;
+		} catch (error) {
+			throw new InternalServerErrorException(`Error fetching user: ${error}`);
 		}
-		return user
 	}
 
 	async update(id: number, data: UpdateUserDto): Promise<User> {
-		return this.prisma.user.update({ where: { id }, data })
+		try {
+			return await this.prisma.user.update({ where: { id }, data });
+		} catch (error) {
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2025') {
+					throw new NotFoundException(`User with ID ${id} not found`);
+				}
+			}
+			throw new InternalServerErrorException(`Error updating user: ${error}`);
+		}
 	}
 
 	async ban(id: number): Promise<User> {
-		return this.prisma.user.update({
-			where: { id },
-			data: {
-				isBaned: true
+		try {
+			return await this.prisma.user.update({
+				where: { id },
+				data: {
+					isBaned: true
+				}
+			});
+		} catch (error) {
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2025') {
+					throw new NotFoundException(`User with ID ${id} not found`);
+				}
 			}
-		})
+			throw new InternalServerErrorException(`Error banning user: ${error}`);
+		}
 	}
+
 	async unban(id: number): Promise<User> {
-		return this.prisma.user.update({
-			where: { id },
-			data: {
-				isBaned: false
+		try {
+			return await this.prisma.user.update({
+				where: { id },
+				data: {
+					isBaned: false
+				}
+			});
+		} catch (error) {
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2025') {
+					throw new NotFoundException(`User with ID ${id} not found`);
+				}
 			}
-		})
+			throw new InternalServerErrorException(`Error unbanning user: ${error}`);
+		}
 	}
 
 	async updateUserRole(id: number, role: UserRole): Promise<User> {
@@ -132,27 +173,32 @@ export class UserService {
 			const user = await this.prisma.user.update({
 				where: { id },
 				data: { role }
-			})
-
-			return user
+			});
+			return user;
 		} catch (error) {
-			throw new InternalServerErrorException(
-				`Ошибка при обновлении роли пользователя: ${error}`
-			)
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2025') {
+					throw new NotFoundException(`User with ID ${id} not found`);
+				}
+			}
+			throw new InternalServerErrorException(`Error updating user role: ${error}`);
 		}
 	}
+
 	async updateUserAdmin(id: number, isAdmin: boolean): Promise<UserAdmin> {
 		try {
 			const user = await this.prisma.userAdmin.update({
 				where: { id },
 				data: { isAdmin }
-			})
-
-			return user
+			});
+			return user;
 		} catch (error) {
-			throw new InternalServerErrorException(
-				`Ошибка при обновлении роли пользователя: ${error}`
-			)
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2025') {
+					throw new NotFoundException(`Admin with ID ${id} not found`);
+				}
+			}
+			throw new InternalServerErrorException(`Error updating admin role: ${error}`);
 		}
 	}
 }
