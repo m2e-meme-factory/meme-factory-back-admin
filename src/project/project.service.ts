@@ -5,7 +5,11 @@ import {
 	BadRequestException
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto'
+import {
+	CreateProjectDto,
+	UpdateProjectDto,
+	UpdateProjectStatusDto
+} from './dto/project.dto'
 import { Project } from '@prisma/client'
 import { FilterProjectDto } from './dto/filter-project.dto'
 import { Prisma } from '@prisma/client'
@@ -268,6 +272,22 @@ export class ProjectService {
 				`Ошибка при обновлении проекта: ${error}`
 			)
 		}
+	}
+
+	async updateProjectStatus(id: number, dto: UpdateProjectStatusDto) {
+		const { status } = dto
+		const response = await this.prisma.project.update({
+			where: {
+				id
+			},
+			data: { status }
+		})
+
+		if (!response) {
+			throw new NotFoundException('Project not found')
+		}
+
+		return response
 	}
 
 	async remove(id: number) {

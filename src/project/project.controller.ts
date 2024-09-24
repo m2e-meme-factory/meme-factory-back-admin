@@ -2,13 +2,15 @@ import {
 	Controller,
 	Get,
 	Post,
+	Put,
 	Body,
 	Param,
 	Delete,
 	Patch,
 	Query,
 	ValidationPipe,
-	UsePipes
+	UsePipes,
+	ParseIntPipe
 } from '@nestjs/common'
 import { ProjectService } from './project.service'
 import {
@@ -19,7 +21,7 @@ import {
 	ApiParam,
 	ApiBearerAuth,
 } from '@nestjs/swagger'
-import { CreateProjectDto, ProjectWithTasksDto, UpdateProjectDto } from './dto/project.dto'
+import { CreateProjectDto, ProjectDto, ProjectWithTasksDto, UpdateProjectDto, UpdateProjectStatusDto } from './dto/project.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { Project, ProjectStatus } from '@prisma/client'
 import { FilterProjectDto, PaginatedProjectResponseDto } from './dto/filter-project.dto'
@@ -126,6 +128,16 @@ export class ProjectController {
 	): Promise<Project> {
 		const projectId = parseInt(id)
 		return this.projectService.updateProject(projectId, updateProjectDto)
+	}
+
+	@ApiBody({ type: UpdateProjectStatusDto })
+	@ApiResponse({ status: 200, description: 'OK', type: ProjectDto })
+	@ApiResponse({ status: 400, description: 'Неверные данные запроса.' })
+	@ApiResponse({ status: 404, description: 'Проект не найден.' })
+	@Put(':id/status')
+	@Auth('admin')
+	async updateProjectStatus(@Param('id', ParseIntPipe) id: number, @Body() updateProjectStatusDto: UpdateProjectStatusDto) {
+		return this.projectService.updateProjectStatus(id, updateProjectStatusDto)
 	}
 
 	@Delete(':id')

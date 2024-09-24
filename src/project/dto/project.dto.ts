@@ -5,6 +5,7 @@ import {
 	ArrayMinSize,
 	IsArray,
 	IsDecimal,
+	IsEnum,
 	IsInt,
 	IsNotEmpty,
 	IsNumber,
@@ -168,8 +169,10 @@ export class UpdateProjectDto extends OmitType(CreateProjectDto, [
 	deletedTasks?: number[]
 }
 
+
 export class UpdateProjectStatusDto {
 	@ApiProperty({ enum: ProjectStatus })
+	@IsEnum({ProjectStatus})
 	status: ProjectStatus
 }
 // export class UpdateProjectApplicationStatusDto {
