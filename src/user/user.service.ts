@@ -1,21 +1,52 @@
-import {
-	Injectable,
-	InternalServerErrorException,
-	NotFoundException,
-	ConflictException
-} from '@nestjs/common'
+import { Injectable, InternalServerErrorException, NotFoundException, ConflictException } from '@nestjs/common'
 import { Prisma, User, UserAdmin, UserRole } from '@prisma/client'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { CreateUserDto, GetUserDto, UpdateUserDto } from './dto/user.dto'
 import { FilterUserDto } from './dto/filter-user.dto'
+import { Observer } from 'src/observer/observer.interface'
+import { AdminActionLogService } from 'src/admin-action-log/admin-action-log.service'
 
 @Injectable()
 export class UserService {
-	constructor(private readonly prisma: PrismaService) {}
+	private observers: Observer[] = []
 
-	async create(data: CreateUserDto): Promise<User> {
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly adminActionLogService: AdminActionLogService
+	) {
+		this.attach(adminActionLogService)
+	}
+
+	attach(observer: Observer): void {
+		this.observers.push(observer)
+	}
+
+	detach(observer: Observer): void {
+		const index = this.observers.indexOf(observer)
+		if (index > -1) {
+			this.observers.splice(index, 1)
+		}
+	}
+
+	notify(action: string, details: any): void {
+		for (const observer of this.observers) {
+			observer.update(action, details)
+		}
+	}
+
+	async create(data: CreateUserDto, adminId: number): Promise<User> {
 		try {
-			return await this.prisma.user.create({ data })
+			const newUser = await this.prisma.user.create({ data })
+
+			this.notify('create', {
+				action: 'CREATE_USER',
+				entityType: 'User',
+				entityId: newUser.id,
+				newData: newUser,
+				adminId
+			})
+
+			return newUser
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2002') {
@@ -123,9 +154,25 @@ export class UserService {
 		}
 	}
 
-	async update(id: number, data: UpdateUserDto): Promise<User> {
+	async update(id: number, data: UpdateUserDto, adminId: number): Promise<User> {
 		try {
-			return await this.prisma.user.update({ where: { id }, data })
+			const oldUser = await this.prisma.user.findUnique({ where: { id } })
+			if (!oldUser) {
+				throw new NotFoundException(`User with ID ${id} not found`)
+			}
+
+			const updatedUser = await this.prisma.user.update({ where: { id }, data })
+
+			this.notify('update', {
+				action: 'UPDATE_USER',
+				entityType: 'User',
+				entityId: updatedUser.id,
+				oldData: oldUser,
+				newData: updatedUser,
+				adminId
+			})
+
+			return updatedUser
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2025') {
@@ -138,14 +185,28 @@ export class UserService {
 		}
 	}
 
-	async ban(id: number): Promise<User> {
+	async ban(id: number, adminId: number): Promise<User> {
 		try {
-			return await this.prisma.user.update({
+			const oldUser = await this.prisma.user.findUnique({ where: { id } })
+			if (!oldUser) {
+				throw new NotFoundException(`User with ID ${id} not found`)
+			}
+
+			const bannedUser = await this.prisma.user.update({
 				where: { id },
-				data: {
-					isBaned: true
-				}
+				data: { isBaned: true }
 			})
+
+			this.notify('update', {
+				action: 'BAN_USER',
+				entityType: 'User',
+				entityId: bannedUser.id,
+				oldData: oldUser,
+				newData: bannedUser,
+				adminId
+			})
+
+			return bannedUser
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2025') {
@@ -158,14 +219,28 @@ export class UserService {
 		}
 	}
 
-	async unban(id: number): Promise<User> {
+	async unban(id: number, adminId: number): Promise<User> {
 		try {
-			return await this.prisma.user.update({
+			const oldUser = await this.prisma.user.findUnique({ where: { id } })
+			if (!oldUser) {
+				throw new NotFoundException(`User with ID ${id} not found`)
+			}
+
+			const unbannedUser = await this.prisma.user.update({
 				where: { id },
-				data: {
-					isBaned: false
-				}
+				data: { isBaned: false }
 			})
+
+			this.notify('update', {
+				action: 'UNBAN_USER',
+				entityType: 'User',
+				entityId: unbannedUser.id,
+				oldData: oldUser,
+				newData: unbannedUser,
+				adminId
+			})
+
+			return unbannedUser
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2025') {
@@ -178,13 +253,28 @@ export class UserService {
 		}
 	}
 
-	async updateUserRole(id: number, role: UserRole): Promise<User> {
+	async updateUserRole(id: number, role: UserRole, adminId: number): Promise<User> {
 		try {
-			const user = await this.prisma.user.update({
+			const oldUser = await this.prisma.user.findUnique({ where: { id } })
+			if (!oldUser) {
+				throw new NotFoundException(`User with ID ${id} not found`)
+			}
+
+			const updatedUser = await this.prisma.user.update({
 				where: { id },
 				data: { role }
 			})
-			return user
+
+			this.notify('update', {
+				action: 'UPDATE_USER_ROLE',
+				entityType: 'User',
+				entityId: updatedUser.id,
+				oldData: oldUser,
+				newData: updatedUser,
+				adminId
+			})
+
+			return updatedUser
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2025') {
@@ -197,13 +287,28 @@ export class UserService {
 		}
 	}
 
-	async updateUserAdmin(id: number, isAdmin: boolean): Promise<UserAdmin> {
+	async updateUserAdmin(id: number, isAdmin: boolean, adminId: number): Promise<UserAdmin> {
 		try {
-			const user = await this.prisma.userAdmin.update({
+			const oldUserAdmin = await this.prisma.userAdmin.findUnique({ where: { id } })
+			if (!oldUserAdmin) {
+				throw new NotFoundException(`Admin with ID ${id} not found`)
+			}
+
+			const updatedUserAdmin = await this.prisma.userAdmin.update({
 				where: { id },
 				data: { isAdmin }
 			})
-			return user
+
+			this.notify('update', {
+				action: 'UPDATE_USER_ADMIN',
+				entityType: 'UserAdmin',
+				entityId: updatedUserAdmin.id,
+				oldData: oldUserAdmin,
+				newData: updatedUserAdmin,
+				adminId
+			})
+
+			return updatedUserAdmin
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2025') {

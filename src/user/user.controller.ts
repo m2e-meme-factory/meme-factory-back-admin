@@ -10,7 +10,8 @@ import {
 	ParseIntPipe,
 	Put,
 	UsePipes,
-	ValidationPipe
+	ValidationPipe,
+	Req
 } from '@nestjs/common'
 import { UserService } from './user.service'
 import { User, UserAdmin, UserRole } from '@prisma/client'
@@ -33,8 +34,9 @@ export class UserController {
 	})
 	@ApiResponse({ status: 400, description: 'Bad Request' })
 	@Auth('admin')
-	async create(@Body() createUserDto: CreateUserDto): Promise<User> {
-		return this.userService.create(createUserDto)
+	async create(@Body() createUserDto: CreateUserDto, @Req() req: Request): Promise<User> {
+		const adminId = req['user'].id
+		return this.userService.create(createUserDto, adminId)
 	}
 
 	@Get()
@@ -74,9 +76,11 @@ export class UserController {
 	@UsePipes(new ValidationPipe({transform: true}))
 	async update(
 		@Param('id') id: number,
-		@Body() updateUserDto: UpdateUserDto
+		@Body() updateUserDto: UpdateUserDto,
+		@Req() req: Request
 	): Promise<User> {
-		return this.userService.update(id, updateUserDto)
+		const adminId = req['user'].id
+		return this.userService.update(id, updateUserDto, adminId)
 	}
 
 	@Put(':id/ban')
@@ -87,8 +91,9 @@ export class UserController {
 	})
 	@ApiResponse({ status: 404, description: 'User not found' })
 	@Auth('admin')
-	async ban(@Param('id', ParseIntPipe) id: number): Promise<User> {
-		return this.userService.ban(id)
+	async ban(@Param('id', ParseIntPipe) id: number, @Req() req: Request): Promise<User> {
+		const adminId = req['user'].id
+		return this.userService.ban(id, adminId)
 	}
 	@Put(':id/unban')
 	@ApiResponse({
@@ -98,8 +103,9 @@ export class UserController {
 	})
 	@ApiResponse({ status: 404, description: 'User not found' })
 	@Auth('admin')
-	async unban(@Param('id', ParseIntPipe) id: number): Promise<User> {
-		return this.userService.unban(id)
+	async unban(@Param('id', ParseIntPipe) id: number, @Req() req: Request): Promise<User> {
+		const adminId = req['user'].id
+		return this.userService.unban(id, adminId)
 	}
 
 	@Put(':id/role')
@@ -130,9 +136,11 @@ export class UserController {
 	@Auth('admin')
 	async updateUserRole(
 		@Param('id', ParseIntPipe) id: number,
-		@Body() updateUserRoleDto: UpdateUserRoleDto
+		@Body() updateUserRoleDto: UpdateUserRoleDto,
+		@Req() req: Request
 	): Promise<User> {
-		return this.userService.updateUserRole(id, updateUserRoleDto.role)
+		const adminId = req['user'].id
+		return this.userService.updateUserRole(id, updateUserRoleDto.role, adminId)
 	}
 	
 	@Put(':id/is-admin')
@@ -156,11 +164,13 @@ export class UserController {
 	@ApiResponse({ status: 400, description: 'Неверные данные запроса.' })
 	@ApiResponse({ status: 404, description: 'Пользователь не найден.' })
 	@ApiResponse({ status: 403, description: 'Доступ запрещен.' })
-	// @Auth('admin')
+	@Auth('admin')
 	async updateUserAdmin(
 		@Param('id', ParseIntPipe) id: number,
-		@Body() updateUserAdminDto: UpdateUserAdminDto
+		@Body() updateUserAdminDto: UpdateUserAdminDto,
+		@Req() req: Request
 	): Promise<UserAdmin> {
-		return this.userService.updateUserAdmin(id, updateUserAdminDto.isAdmin)
+		const adminId = req['user'].id
+		return this.userService.updateUserAdmin(id, updateUserAdminDto.isAdmin, adminId)
 	}
 }
