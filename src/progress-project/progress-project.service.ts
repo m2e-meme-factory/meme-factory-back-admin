@@ -9,10 +9,36 @@ import { ProgressProject, Prisma } from '@prisma/client'
 import { UpdateProgressProjectDto } from './dto/progress-project.dto'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { FilterProgressProjectDto } from './dto/filter-progress-project.dto'
+import { Observer } from 'src/observer/observer.interface'
+import { AdminActionLogService } from 'src/admin-action-log/admin-action-log.service'
 
 @Injectable()
 export class ProgressProjectService {
-	constructor(private readonly prisma: PrismaService) {}
+	private observers: Observer[] = []
+
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly adminActionLogService: AdminActionLogService
+	) {
+		this.attach(adminActionLogService)
+	}
+
+	attach(observer: Observer): void {
+		this.observers.push(observer)
+	}
+
+	detach(observer: Observer): void {
+		const index = this.observers.indexOf(observer)
+		if (index > -1) {
+			this.observers.splice(index, 1)
+		}
+	}
+
+	notify(action: string, details: any): void {
+		for (const observer of this.observers) {
+			observer.update(action, details)
+		}
+	}
 
 	private validateCreateData(data: any) {
 		if (!data.projectId || !data.userId) {
@@ -27,7 +53,7 @@ export class ProgressProjectService {
 		}
 	}
 
-	async create(data): Promise<ProgressProject> {
+	async create(data, adminId: number): Promise<ProgressProject> {
 		this.validateCreateData(data)
 
 		try {
@@ -48,9 +74,19 @@ export class ProgressProjectService {
 				)
 			}
 
-			return await this.prisma.progressProject.create({
+			const newProgressProject = await this.prisma.progressProject.create({
 				data
 			})
+
+			this.notify('create', {
+				action: 'CREATE_PROGRESS_PROJECT',
+				entityType: 'ProgressProject',
+				entityId: newProgressProject.id,
+				newData: newProgressProject,
+				adminId
+			})
+
+			return newProgressProject
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2002') {
@@ -158,28 +194,39 @@ export class ProgressProjectService {
 
 	async update(
 		id: number,
-		data: UpdateProgressProjectDto
+		data: UpdateProgressProjectDto,
+		adminId: number
 	): Promise<ProgressProject> {
 		if (typeof id !== 'number' || isNaN(id)) {
 			throw new BadRequestException('ID должен быть числом.')
 		}
 
 		try {
-			const progressProjectExists =
-				await this.prisma.progressProject.findUnique({
-					where: { id }
-				})
+			const oldProgressProject = await this.prisma.progressProject.findUnique({
+				where: { id }
+			})
 
-			if (!progressProjectExists) {
+			if (!oldProgressProject) {
 				throw new NotFoundException(
 					`Прогресс проекта с ID ${id} не найден`
 				)
 			}
 
-			return await this.prisma.progressProject.update({
+			const updatedProgressProject = await this.prisma.progressProject.update({
 				where: { id },
 				data
 			})
+
+			this.notify('update', {
+				action: 'UPDATE_PROGRESS_PROJECT',
+				entityType: 'ProgressProject',
+				entityId: updatedProgressProject.id,
+				oldData: oldProgressProject,
+				newData: updatedProgressProject,
+				adminId
+			})
+
+			return updatedProgressProject
 		} catch (error) {
 			if (error instanceof NotFoundException) {
 				throw error
@@ -190,17 +237,36 @@ export class ProgressProjectService {
 		}
 	}
 
-	async remove(id: number): Promise<ProgressProject> {
+	async remove(id: number, adminId: number): Promise<ProgressProject> {
 		if (typeof id !== 'number' || isNaN(id)) {
 			throw new BadRequestException('ID должен быть числом.')
 		}
 
 		try {
-			const progressProject = await this.prisma.progressProject.delete({
+			const progressProjectToDelete = await this.prisma.progressProject.findUnique({
 				where: { id }
 			})
 
-			return progressProject
+			if (!progressProjectToDelete) {
+				throw new NotFoundException(
+					`Прогресс проекта с ID ${id} не найден`
+				)
+			}
+
+			const deletedProgressProject = await this.prisma.progressProject.delete({
+				where: { id }
+			})
+
+			this.notify('delete', {
+				action: 'DELETE_PROGRESS_PROJECT',
+				entityType: 'ProgressProject',
+				entityId: deletedProgressProject.id,
+				oldData: progressProjectToDelete,
+				newData: null,
+				adminId
+			})
+
+			return deletedProgressProject
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2025') {

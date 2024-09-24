@@ -9,10 +9,36 @@ import { CreateAutoTaskDto, UpdateAutoTaskDto } from './dto/auto-task.dto'
 import { AutoTask, AutoTaskApplication, Prisma } from '@prisma/client'
 import { PrismaService } from 'src/prisma/prisma.service'
 import { FilterAutoTaskDto } from './dto/fielter-auto-task.dto'
+import { Observer } from 'src/observer/observer.interface'
+import { AdminActionLogService } from 'src/admin-action-log/admin-action-log.service'
 
 @Injectable()
 export class AutoTaskService {
-	constructor(private readonly prisma: PrismaService) {}
+	private observers: Observer[] = []
+
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly adminActionLogService: AdminActionLogService
+	) {
+		this.attach(adminActionLogService)
+	}
+
+	attach(observer: Observer): void {
+		this.observers.push(observer)
+	}
+
+	detach(observer: Observer): void {
+		const index = this.observers.indexOf(observer)
+		if (index > -1) {
+			this.observers.splice(index, 1)
+		}
+	}
+
+	notify(action: string, details: any): void {
+		for (const observer of this.observers) {
+			observer.update(action, details)
+		}
+	}
 
 	async getAutoTaskApplications(
 		userId?: number,
@@ -144,7 +170,7 @@ export class AutoTaskService {
 		}
 	}
 
-	async createTask(dto: CreateAutoTaskDto): Promise<AutoTask> {
+	async createTask(dto: CreateAutoTaskDto, adminId: number): Promise<AutoTask> {
 		try {
 			const { title, description, reward, url, isIntegrated } = dto
 
@@ -163,6 +189,15 @@ export class AutoTaskService {
 					isIntegrated
 				}
 			})
+
+			this.notify('create', {
+				action: 'CREATE_AUTO_TASK',
+				entityType: 'AutoTask',
+				entityId: task.id,
+				newData: task,
+				adminId
+			})
+
 			return task
 		} catch (error) {
 			if (
@@ -181,7 +216,8 @@ export class AutoTaskService {
 
 	async updateTask(
 		taskId: number,
-		dto: UpdateAutoTaskDto
+		dto: UpdateAutoTaskDto,
+		adminId: number
 	): Promise<AutoTask> {
 		try {
 			const { title, description, reward, url, isIntegrated } = dto
@@ -199,7 +235,7 @@ export class AutoTaskService {
 				)
 			}
 
-			const task = await this.prisma.autoTask.update({
+			const updatedTask = await this.prisma.autoTask.update({
 				where: { id: taskId },
 				data: {
 					title,
@@ -209,7 +245,17 @@ export class AutoTaskService {
 					isIntegrated
 				}
 			})
-			return task
+
+			this.notify('update', {
+				action: 'UPDATE_AUTO_TASK',
+				entityType: 'AutoTask',
+				entityId: updatedTask.id,
+				oldData: existingTask,
+				newData: updatedTask,
+				adminId
+			})
+
+			return updatedTask
 		} catch (error) {
 			if (
 				error instanceof Prisma.PrismaClientKnownRequestError &&
@@ -222,6 +268,44 @@ export class AutoTaskService {
 			throw new InternalServerErrorException(
 				`Error updating task: ${error.message}`
 			)
+		}
+	}
+
+	async deleteTask(taskId: number, adminId: number): Promise<AutoTask> {
+		try {
+			if (typeof taskId !== 'number') {
+				throw new BadRequestException('taskId должен быть числом.')
+			}
+
+			const existingTask = await this.prisma.autoTask.findUnique({
+				where: { id: taskId }
+			})
+
+			if (!existingTask) {
+				throw new NotFoundException(`AutoTask с ID ${taskId} не найден.`)
+			}
+
+			const deletedTask = await this.prisma.autoTask.delete({
+				where: { id: taskId }
+			})
+
+			this.notify('delete', {
+				action: 'DELETE_AUTO_TASK',
+				entityType: 'AutoTask',
+				entityId: deletedTask.id,
+				oldData: existingTask,
+				newData: null,
+				adminId
+			})
+
+			return deletedTask
+		} catch (error) {
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2025') {
+					throw new NotFoundException(`AutoTask с ID ${taskId} не найден.`)
+				}
+			}
+			throw new InternalServerErrorException(`Error deleting task: ${error.message}`)
 		}
 	}
 }

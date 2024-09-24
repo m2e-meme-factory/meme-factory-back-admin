@@ -9,7 +9,8 @@ import {
 	Patch,
 	Query,
 	ValidationPipe,
-	UsePipes
+	UsePipes,
+	Req
 } from '@nestjs/common'
 import { ProgressProjectService } from './progress-project.service'
 import { ProgressProject } from '@prisma/client'
@@ -38,9 +39,14 @@ export class ProgressProjectController {
 	})
 	@Auth('admin')
 	create(
-		@Body() createProgressProjectDto: CreateProgressProjectDto
+		@Body() createProgressProjectDto: CreateProgressProjectDto,
+		@Req() req: Request
 	): Promise<ProgressProject> {
-		return this.progressProjectService.create(createProgressProjectDto)
+		const adminId = req['user'].id
+		return this.progressProjectService.create(
+			createProgressProjectDto,
+			adminId
+		)
 	}
 
 	@Get()
@@ -79,19 +85,29 @@ export class ProgressProjectController {
 	@Auth('admin')
 	update(
 		@Param('id') id: number,
-		@Body() updateProgressProjectDto: UpdateProgressProjectDto
+		@Body() updateProgressProjectDto: UpdateProgressProjectDto,
+		@Req() req: Request
 	): Promise<ProgressProject> {
-		return this.progressProjectService.update(id, updateProgressProjectDto)
+		const adminId = req['user'].id
+		return this.progressProjectService.update(
+			id,
+			updateProgressProjectDto,
+			adminId
+		)
 	}
 
 	@Delete(':id')
 	@ApiResponse({
 		status: 200,
-		description: 'Удаление прогресса проекта',
+		description: 'Удаление прогресса проекта'
 	})
 	@ApiResponse({ status: 404, description: 'Прогресс проекта не найден' })
 	@Auth('admin')
-	remove(@Param('id') id: number): Promise<ProgressProject> {
-		return this.progressProjectService.remove(id)
+	remove(
+		@Param('id') id: number,
+		@Req() req: Request
+	): Promise<ProgressProject> {
+		const adminId = req['user'].id
+		return this.progressProjectService.remove(id, adminId)
 	}
 }

@@ -8,14 +8,17 @@ import {
 	Post,
 	Put,
 	Query,
+	Req,
 	UsePipes,
-	ValidationPipe
+	ValidationPipe,
+	Delete
 } from '@nestjs/common'
 import { AutoTaskService } from './auto-task.service'
 import {
 	ApiBearerAuth,
 	ApiBody,
 	ApiOperation,
+	ApiParam,
 	ApiQuery,
 	ApiResponse,
 	ApiTags
@@ -48,9 +51,14 @@ export class AutoTaskController {
 	})
 	@ApiResponse({ status: 500, description: 'Ошибка создания задачи.' })
 	@Post()
-	async createTask(@Body() dto: CreateAutoTaskDto): Promise<AutoTask> {
+	@Auth('admin')
+	async createTask(
+		@Body() dto: CreateAutoTaskDto,
+		@Req() req: Request
+	): Promise<AutoTask> {
 		try {
-			return await this.autoTaskService.createTask(dto)
+			const adminId = req['user'].id
+			return await this.autoTaskService.createTask(dto, adminId)
 		} catch (error) {
 			throw new InternalServerErrorException(error.message)
 		}
@@ -83,7 +91,10 @@ export class AutoTaskController {
 		description: 'Number of objects to show',
 		example: 1
 	})
-	@ApiResponse({ status: 200, type: [PaginatedAutoTaskApplicationResponseDto] })
+	@ApiResponse({
+		status: 200,
+		type: [PaginatedAutoTaskApplicationResponseDto]
+	})
 	@Get('applications')
 	async getAutoTaskApplications(
 		@Query('userId') userId?: number,
@@ -117,14 +128,40 @@ export class AutoTaskController {
 	@ApiResponse({ status: 201, description: 'Задача обновлена успешно.' })
 	@ApiResponse({ status: 500, description: 'Ошибка обновления задачи.' })
 	@Put(':id/update')
+	@Auth('admin')
 	async updateTask(
 		@Param('id', ParseIntPipe) id: number,
-		@Body() dto: UpdateAutoTaskDto
+		@Body() dto: UpdateAutoTaskDto,
+		@Req() req: Request
 	): Promise<AutoTask> {
 		try {
-			return await this.autoTaskService.updateTask(id, dto)
+			const adminId = req['user'].id
+			return await this.autoTaskService.updateTask(id, dto, adminId)
 		} catch (error) {
 			throw new InternalServerErrorException(error.message)
 		}
+	}
+
+	@Delete(':id')
+	@ApiOperation({ summary: 'Delete an auto task' })
+	@ApiParam({ name: 'id', type: 'number', description: 'Auto task ID' })
+	@ApiResponse({
+		status: 200,
+		description: 'The auto task has been successfully deleted.',
+		type: AutoTaskDto
+	})
+	@ApiResponse({
+		status: 400,
+		description: 'Bad Request. taskId must be a number.'
+	})
+	@ApiResponse({ status: 404, description: 'Auto task not found.' })
+	@ApiResponse({ status: 500, description: 'Internal server error.' })
+	@Auth('admin')
+	async deleteTask(
+		@Param('id') id: string,
+		@Req() req: Request
+	): Promise<AutoTask> {
+		const adminId = req['user'].id
+		return this.autoTaskService.deleteTask(+id, adminId)
 	}
 }
