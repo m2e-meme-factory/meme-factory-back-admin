@@ -9,22 +9,56 @@ import { CreateTransactionDto } from './dto/create-transaction.dto'
 import { UpdateTransactionDto } from './dto/update-transaction.dto'
 import { FilterTransactionDto } from './dto/filters-transaction.dto'
 import { Prisma } from '@prisma/client'
+import { Observer } from 'src/observer/observer.interface'
+import { AdminActionLogService } from 'src/admin-action-log/admin-action-log.service'
 
 @Injectable()
 export class TransactionService {
-	constructor(private readonly prisma: PrismaService) {}
+	private observers: Observer[] = []
 
-	async create(createTransactionDto: CreateTransactionDto) {
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly adminActionLogService: AdminActionLogService
+	) {
+		this.attach(adminActionLogService)
+	}
+
+	attach(observer: Observer): void {
+		this.observers.push(observer)
+	}
+
+	detach(observer: Observer): void {
+		const index = this.observers.indexOf(observer)
+		if (index > -1) {
+			this.observers.splice(index, 1)
+		}
+	}
+
+	notify(action: string, details: any): void {
+		for (const observer of this.observers) {
+			observer.update(action, details)
+		}
+	}
+
+	async create(createTransactionDto: CreateTransactionDto, adminId: number) {
 		try {
-			return await this.prisma.transaction.create({
+			const newTransaction = await this.prisma.transaction.create({
 				data: createTransactionDto
 			})
+
+			this.notify('create', {
+				action: 'CREATE_TRANSACTION',
+				entityType: 'Transaction',
+				entityId: newTransaction.id,
+				newData: newTransaction,
+				adminId
+			})
+
+			return newTransaction
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2002') {
-					throw new BadRequestException(
-						'Transaction with this data already exists'
-					)
+					throw new BadRequestException('Transaction with this data already exists')
 				}
 			}
 			throw new InternalServerErrorException('Error creating transaction')
@@ -127,42 +161,66 @@ export class TransactionService {
 		}
 	}
 
-	async update(id: number, updateTransactionDto: UpdateTransactionDto) {
+	async update(id: number, updateTransactionDto: UpdateTransactionDto, adminId: number) {
 		try {
-			return await this.prisma.transaction.update({
+			const oldTransaction = await this.prisma.transaction.findUnique({ where: { id } })
+			if (!oldTransaction) {
+				throw new NotFoundException(`Transaction with ID ${id} not found`)
+			}
+
+			const updatedTransaction = await this.prisma.transaction.update({
 				where: { id },
 				data: updateTransactionDto
 			})
+
+			this.notify('update', {
+				action: 'UPDATE_TRANSACTION',
+				entityType: 'Transaction',
+				entityId: updatedTransaction.id,
+				oldData: oldTransaction,
+				newData: updatedTransaction,
+				adminId
+			})
+
+			return updatedTransaction
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2025') {
-					throw new NotFoundException(
-						`Transaction with ID ${id} not found`
-					)
+					throw new NotFoundException(`Transaction with ID ${id} not found`)
 				}
 			}
-			throw new InternalServerErrorException(
-				`Error updating transaction: ${error}`
-			)
+			throw new InternalServerErrorException(`Error updating transaction: ${error}`)
 		}
 	}
 
-	async remove(id: number) {
+	async remove(id: number, adminId: number) {
 		try {
-			return await this.prisma.transaction.delete({
+			const transactionToDelete = await this.prisma.transaction.findUnique({ where: { id } })
+			if (!transactionToDelete) {
+				throw new NotFoundException(`Transaction with ID ${id} not found`)
+			}
+
+			const deletedTransaction = await this.prisma.transaction.delete({
 				where: { id }
 			})
+
+			this.notify('delete', {
+				action: 'DELETE_TRANSACTION',
+				entityType: 'Transaction',
+				entityId: deletedTransaction.id,
+				oldData: transactionToDelete,
+				newData: null,
+				adminId
+			})
+
+			return deletedTransaction
 		} catch (error) {
 			if (error instanceof Prisma.PrismaClientKnownRequestError) {
 				if (error.code === 'P2025') {
-					throw new NotFoundException(
-						`Transaction with ID ${id} not found`
-					)
+					throw new NotFoundException(`Transaction with ID ${id} not found`)
 				}
 			}
-			throw new InternalServerErrorException(
-				`Error deleting transaction: ${error}`
-			)
+			throw new InternalServerErrorException(`Error deleting transaction: ${error}`)
 		}
 	}
 }

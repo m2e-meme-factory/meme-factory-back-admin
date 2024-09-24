@@ -8,7 +8,8 @@ import {
 	Patch,
 	Delete,
 	ValidationPipe,
-	UsePipes
+	UsePipes,
+	Req
 } from '@nestjs/common'
 import { TransactionService } from './transaction.service'
 import {
@@ -42,8 +43,9 @@ export class TransactionController {
 	})
 	@ApiResponse({ status: 400, description: 'Неверные данные.' })
 	@Auth('admin')
-	create(@Body() createTransactionDto: CreateTransactionDto) {
-		return this.transactionService.create(createTransactionDto)
+	create(@Body() createTransactionDto: CreateTransactionDto, @Req() req: Request) {
+		const adminId = req['user'].id
+		return this.transactionService.create(createTransactionDto, adminId)
 	}
 
 	@Get()
@@ -84,9 +86,11 @@ export class TransactionController {
 	@Auth('admin')
 	update(
 		@Param('id') id: string,
-		@Body() updateTransactionDto: UpdateTransactionDto
+		@Body() updateTransactionDto: UpdateTransactionDto,
+		@Req() req: Request
 	) {
-		return this.transactionService.update(+id, updateTransactionDto)
+		const adminId = req['user'].id
+		return this.transactionService.update(+id, updateTransactionDto, adminId)
 	}
 
 	@Delete(':id')
@@ -94,7 +98,8 @@ export class TransactionController {
 	@ApiResponse({ status: 204, description: 'Транзакция успешно удалена.' })
 	@ApiResponse({ status: 404, description: 'Транзакция не найдена.' })
 	@Auth('admin')
-	remove(@Param('id') id: string) {
-		return this.transactionService.remove(+id)
+	remove(@Param('id') id: string, @Req() req: Request) {
+		const adminId = req['user'].id
+		return this.transactionService.remove(+id, adminId)
 	}
 }

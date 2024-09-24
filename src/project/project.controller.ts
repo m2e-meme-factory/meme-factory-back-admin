@@ -5,12 +5,12 @@ import {
 	Put,
 	Body,
 	Param,
-	Delete,
 	Patch,
 	Query,
 	ValidationPipe,
 	UsePipes,
-	ParseIntPipe
+	ParseIntPipe,
+	Req
 } from '@nestjs/common'
 import { ProjectService } from './project.service'
 import {
@@ -56,9 +56,10 @@ export class ProjectController {
 	@ApiResponse({ status: 400, description: 'Неверные данные запроса.' })
 	@Auth('admin')
 	async createProject(
-		@Body() createProjectDto: CreateProjectDto
+		@Body() createProjectDto: CreateProjectDto, @Req() req: Request
 	): Promise<Project> {
-		return this.projectService.createProject(createProjectDto)
+		const adminId = req['user'].id
+		return this.projectService.createProject(createProjectDto, adminId)
 	}
 
 	@Get()
@@ -124,10 +125,12 @@ export class ProjectController {
 	@Auth('admin')
 	async updateProject(
 		@Param('id') id: string,
-		@Body() updateProjectDto: UpdateProjectDto
+		@Body() updateProjectDto: UpdateProjectDto,
+		@Req() req: Request
 	): Promise<Project> {
+		const adminId = req['user'].id
 		const projectId = parseInt(id)
-		return this.projectService.updateProject(projectId, updateProjectDto)
+		return this.projectService.updateProject(projectId, updateProjectDto, adminId)
 	}
 
 	@ApiBody({ type: UpdateProjectStatusDto })
@@ -136,16 +139,17 @@ export class ProjectController {
 	@ApiResponse({ status: 404, description: 'Проект не найден.' })
 	@Put(':id/status')
 	@Auth('admin')
-	async updateProjectStatus(@Param('id', ParseIntPipe) id: number, @Body() updateProjectStatusDto: UpdateProjectStatusDto) {
-		return this.projectService.updateProjectStatus(id, updateProjectStatusDto)
+	async updateProjectStatus(@Param('id', ParseIntPipe) id: number, @Body() updateProjectStatusDto: UpdateProjectStatusDto, @Req() req: Request) {
+		const adminId = req['user'].id
+		return this.projectService.updateProjectStatus(id, updateProjectStatusDto, adminId)
 	}
 
-	@Delete(':id')
-	@ApiOperation({ summary: 'Удалить проект' })
-	@ApiResponse({ status: 204, description: 'Проект успешно удален.' })
-	@ApiResponse({ status: 404, description: 'Проект не найден.' })
-	@Auth('admin')
-	remove(@Param('id') id: string) {
-		return this.projectService.remove(+id)
-	}
+	// @Delete(':id')
+	// @ApiOperation({ summary: 'Удалить проект' })
+	// @ApiResponse({ status: 204, description: 'Проект успешно удален.' })
+	// @ApiResponse({ status: 404, description: 'Проект не найден.' })
+	// @Auth('admin')
+	// remove(@Param('id') id: string) {
+	// 	return this.projectService.remove(+id)
+	// }
 }

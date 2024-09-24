@@ -176,6 +176,17 @@ model MetaTag {
   @@map("meta_tags")
 }
 
+model AdminActionLog {
+  id        Int      @id @default(autoincrement())
+  action    String
+  entityType String
+  entityId   Int
+  oldData   Json?
+  newData   Json?
+  adminId   Int
+  createdAt DateTime @default(now())
+}
+
 enum UserRole {
   creator
   advertiser
