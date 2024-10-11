@@ -1,16 +1,19 @@
+import { ApiPropertyOptional } from '@nestjs/swagger'
 import {
+	IsArray,
+	IsBoolean,
+	IsEnum,
+	IsInt,
 	IsOptional,
 	IsString,
-	IsInt,
-	IsArray,
 	ArrayMinSize
 } from 'class-validator'
 import { Transform } from 'class-transformer'
-import { ApiPropertyOptional } from '@nestjs/swagger'
+import { UserRole } from '@prisma/client'
 
 export class FilterUserDto {
 	@ApiPropertyOptional({
-		description: 'Search term to filter by name, description or ID'
+		description: 'Search term to filter by username or tag'
 	})
 	@IsOptional()
 	@IsString()
@@ -34,7 +37,9 @@ export class FilterUserDto {
 	@Transform(({ value }) => parseInt(value, 10))
 	limit?: number
 
-	@ApiPropertyOptional({ description: 'Fields to sort by', example: '[name]' })
+	@ApiPropertyOptional({
+		description: 'Fields to sort by',
+	})
 	@IsOptional()
 	@IsArray()
 	@ArrayMinSize(1)
@@ -51,4 +56,38 @@ export class FilterUserDto {
 	@ArrayMinSize(1)
 	@Transform(({ value }) => (Array.isArray(value) ? value : [value]))
 	sortOrder?: ('asc' | 'desc')[]
+
+	@ApiPropertyOptional({
+		description: 'Filter by banned status',
+		example: false
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => value === 'true')
+	isBanned?: boolean
+
+	@ApiPropertyOptional({
+		description: 'Filter by verified status',
+		example: true
+	})
+	@IsOptional()
+	@IsBoolean()
+	@Transform(({ value }) => value === 'true')
+	isVerified?: boolean
+
+	@ApiPropertyOptional({
+		description: 'Filter by referral code',
+		example: 'ABC123'
+	})
+	@IsOptional()
+	@IsString()
+	refCode?: string
+
+	@ApiPropertyOptional({
+		description: 'Filter by user role',
+		enum: UserRole
+	})
+	@IsOptional()
+	@IsEnum(UserRole)
+	role?: UserRole
 }

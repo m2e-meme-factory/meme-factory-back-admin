@@ -1,17 +1,50 @@
 import {
 	Injectable,
 	InternalServerErrorException,
-	NotFoundException
+	NotFoundException,
+	BadRequestException
 } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
-import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto'
+import {
+	CreateProjectDto,
+	UpdateProjectDto,
+	UpdateProjectStatusDto
+} from './dto/project.dto'
 import { Project } from '@prisma/client'
-
+import { FilterProjectDto } from './dto/filter-project.dto'
+import { Prisma } from '@prisma/client'
+import { Observer } from 'src/observer/observer.interface'
+import { AdminActionLogService } from 'src/admin-action-log/admin-action-log.service'
 @Injectable()
 export class ProjectService {
-	constructor(private readonly prisma: PrismaService) {}
+	constructor(
+		private readonly prisma: PrismaService,
+		private readonly adminActionLogService: AdminActionLogService
+	) {
+		this.attach(adminActionLogService)
+	}
+	private observers: Observer[] = []
 
-	async createProject(createProjectDto: CreateProjectDto): Promise<Project> {
+	attach(observer: Observer): void {
+		this.observers.push(observer)
+	}
+
+	detach(observer: Observer): void {
+		const index = this.observers.indexOf(observer)
+		if (index > -1) {
+			this.observers.splice(index, 1)
+		}
+	}
+
+	notify(action: string, details: any): void {
+		for (const observer of this.observers) {
+			observer.update(action, details)
+		}
+	}
+	async createProject(
+		createProjectDto: CreateProjectDto,
+		adminId: number
+	): Promise<Project> {
 		const {
 			title,
 			description,
@@ -24,7 +57,6 @@ export class ProjectService {
 		} = createProjectDto
 
 		try {
-			// const { minPrice, maxPrice } = countProjectPrice(subtasks)
 			const project = await this.prisma.project.create({
 				data: {
 					authorId: authorId,
@@ -52,96 +84,130 @@ export class ProjectService {
 				})
 			}
 
+			this.notify('create', {
+				action: 'CREATE_PROJECT',
+				entityType: 'Project',
+				entityId: project.id,
+				newData: project,
+				adminId
+			})
+
 			return project
 		} catch (error) {
+			if (error instanceof Prisma.PrismaClientKnownRequestError) {
+				if (error.code === 'P2002') {
+					throw new BadRequestException(
+						'Проект с такими данными уже существует.'
+					)
+				}
+			}
 			throw new InternalServerErrorException(
 				`Ошибка при создании проекта: ${error}`
 			)
 		}
 	}
-  
-	async findAll(query: {
-		search?: string
-		sortBy?: string[]
-		sortOrder?: ('asc' | 'desc')[]
-		page?: number
-		pageSize?: number
-		filters?: any
-	}): Promise<{
-		data: Project[]
-		total: number
-		page: number
-		pageSize: number
-	}> {
+
+	async findAll(filterProjectDto: FilterProjectDto) {
 		const {
-			search = '',
+			authorId,
+			title,
+			description,
+			tags,
+			category,
+			status,
 			sortBy = ['id'],
-			sortOrder = ['asc'],
+			sortOrder,
 			page = 1,
-			pageSize = 10,
-			filters = {}
-		} = query
+			limit = 10
+		} = filterProjectDto
+
+		const where: any = {}
+
+		if (authorId !== undefined) {
+			where.authorId = authorId
+		}
+
+		if (title) {
+			where.title = { contains: title, mode: 'insensitive' }
+		}
+
+		if (description) {
+			where.description = { contains: description, mode: 'insensitive' }
+		}
+
+		if (tags) {
+			where.tags = { hasSome: tags }
+		}
+
+		if (category) {
+			where.category = category
+		}
+
+		if (status) {
+			where.status = status
+		}
+
+		const sortByArray = Array.isArray(sortBy) ? sortBy : [sortBy]
+		const sortOrderArray = Array.isArray(sortOrder)
+			? sortOrder
+			: [sortOrder]
+
+		const orderBy = sortByArray.map((field, index) => ({
+			[field]: sortOrderArray[index] || 'asc'
+		}))
 
 		try {
-			const where = {
-				AND: [
-					search
-						? {
-								OR: [
-									{
-										title: {
-											contains: search,
-											mode: 'insensitive'
-										}
-									},
-									{
-										description: {
-											contains: search,
-											mode: 'insensitive'
-										}
-									}
-								]
-							}
-						: {},
-					filters
-				]
-			}
-
-			const orderBy = sortBy.map((field, index) => ({
-				[field]: sortOrder[index] || 'asc'
-			}))
-
-			const projects = await this.prisma.project.findMany({
-				where,
-				orderBy,
-				skip: (page - 1) * pageSize,
-				take: pageSize
-			})
-
-			const total = await this.prisma.project.count({ where })
+			const [projects, total] = await Promise.all([
+				this.prisma.project.findMany({
+					where,
+					orderBy,
+					skip: (page - 1) * limit,
+					take: limit,
+					include: {
+						tasks: {
+							include: { task: true }
+						}
+					}
+				}),
+				this.prisma.project.count({ where })
+			])
 
 			return {
-				data: projects,
 				total,
-				page,
-				pageSize
+				projects
 			}
 		} catch (error) {
 			throw new InternalServerErrorException(
-				`Ошибка при получении проектов: ${error.message}`
+				'Ошибка при получении проектов.'
 			)
 		}
 	}
 
 	async findOne(id: number) {
-		return this.prisma.project.findUnique({
-			where: { id }
-		})
+		try {
+			const project = await this.prisma.project.findUnique({
+				where: { id },
+				include: {
+					tasks: { include: { task: true } }
+				}
+			})
+
+			if (!project) {
+				throw new NotFoundException(`Проект с ID ${id} не найден`)
+			}
+
+			return project
+		} catch (error) {
+			throw new InternalServerErrorException(
+				`Ошибка при получении проекта: ${error}`
+			)
+		}
 	}
 
 	async updateProject(
 		id: number,
-		updateProjectDto: UpdateProjectDto
+		updateProjectDto: UpdateProjectDto,
+		adminId: number
 	): Promise<Project> {
 		const {
 			title,
@@ -155,11 +221,13 @@ export class ProjectService {
 		} = updateProjectDto
 
 		try {
-			const projectExists = await this.prisma.project.findUnique({
-				where: { id }
+			const oldProject = await this.prisma.project.findUnique({
+				where: { id },
+				include: { tasks: true }
 			})
-			if (!projectExists) {
-				throw new NotFoundException('Проект с ID ${id} не найден')
+
+			if (!oldProject) {
+				throw new NotFoundException(`Проект с ID ${id} не найден`)
 			}
 
 			const project = await this.prisma.project.update({
@@ -171,7 +239,8 @@ export class ProjectService {
 					files,
 					tags,
 					category
-				}
+				},
+				include: { tasks: true }
 			})
 
 			if (subtasks) {
@@ -231,21 +300,74 @@ export class ProjectService {
 				}
 			}
 
+			this.notify('update', {
+				action: 'UPDATE_PROJECT',
+				entityType: 'Project',
+				entityId: project.id,
+				oldData: oldProject,
+				newData: project,
+				adminId
+			})
+
 			return project
 		} catch (error) {
 			if (error instanceof NotFoundException) {
 				throw error
 			}
 			throw new InternalServerErrorException(
-				`Ошибка при обновлении проекта: ${error}`,
-				error
+				`Ошибка при обновлении проекта: ${error}`
 			)
 		}
 	}
 
-	async remove(id: number) {
-		return this.prisma.project.delete({
+	async updateProjectStatus(
+		id: number,
+		dto: UpdateProjectStatusDto,
+		adminId: number
+	) {
+		const { status } = dto
+
+		const oldProject = await this.prisma.project.findUnique({
 			where: { id }
 		})
+
+		if (!oldProject) {
+			throw new NotFoundException('Project not found')
+		}
+
+		const updatedProject = await this.prisma.project.update({
+			where: { id },
+			data: { status }
+		})
+
+		this.notify('update', {
+			action: 'UPDATE_PROJECT_STATUS',
+			entityType: 'Project',
+			entityId: updatedProject.id,
+			oldData: oldProject,
+			newData: updatedProject,
+			adminId
+		})
+
+		return updatedProject
 	}
+
+	// async remove(id: number) {
+	// 	try {
+	// 		const project = await this.prisma.project.delete({
+	// 			where: { id }
+	// 		})
+
+	// 		return project
+	// 	} catch (error) {
+	// 		if (error instanceof Prisma.PrismaClientKnownRequestError) {
+	// 			if (error.code === 'P2025') {
+	// 				throw new NotFoundException(`Проект с ID ${id} не найден`)
+	// 			}
+	// 		}
+	// 		throw new InternalServerErrorException(
+	// 			`Ошибка при удалении проекта: ${error}`
+	// 		)
+	// 	}
+	// }
 }

@@ -2,11 +2,15 @@ import {
 	Controller,
 	Get,
 	Post,
+	Put,
 	Body,
 	Param,
-	Delete,
 	Patch,
-	Query
+	Query,
+	ValidationPipe,
+	UsePipes,
+	ParseIntPipe,
+	Req
 } from '@nestjs/common'
 import { ProjectService } from './project.service'
 import {
@@ -15,12 +19,12 @@ import {
 	ApiOperation,
 	ApiBody,
 	ApiParam,
-	ApiQuery,
-	ApiBearerAuth
+	ApiBearerAuth,
 } from '@nestjs/swagger'
-import { CreateProjectDto, UpdateProjectDto } from './dto/project.dto'
+import { CreateProjectDto, ProjectDto, ProjectWithTasksDto, UpdateProjectDto, UpdateProjectStatusDto } from './dto/project.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { Project, ProjectStatus } from '@prisma/client'
+import { FilterProjectDto, PaginatedProjectResponseDto } from './dto/filter-project.dto'
 
 @ApiBearerAuth('access-token')
 @ApiTags('projects')
@@ -52,78 +56,22 @@ export class ProjectController {
 	@ApiResponse({ status: 400, description: 'Неверные данные запроса.' })
 	@Auth('admin')
 	async createProject(
-		@Body() createProjectDto: CreateProjectDto
+		@Body() createProjectDto: CreateProjectDto, @Req() req: Request
 	): Promise<Project> {
-		return this.projectService.createProject(createProjectDto)
+		const adminId = req['user'].id
+		return this.projectService.createProject(createProjectDto, adminId)
 	}
 
 	@Get()
-	@ApiOperation({
-		summary: 'Получить все проекты с фильтрацией, сортировкой и пагинацией'
-	})
+	@ApiOperation({ summary: 'Получить все проекты' })
 	@ApiResponse({
 		status: 200,
 		description: 'Список проектов.',
-		type: [CreateProjectDto]
+		type: PaginatedProjectResponseDto
 	})
-	@Auth('admin')
-	@ApiQuery({
-		name: 'search',
-		required: false,
-		description: 'Поиск по названию и описанию'
-	})
-	@ApiQuery({
-		name: 'sortBy',
-		required: false,
-		description: 'Поля для сортировки',
-		type: [String]
-	})
-	@ApiQuery({
-		name: 'sortOrder',
-		required: false,
-		description: 'Порядок сортировки',
-		enum: ['asc', 'desc'],
-		isArray: true
-	})
-	@ApiQuery({
-		name: 'page',
-		required: false,
-		description: 'Номер страницы',
-		type: Number
-	})
-	@ApiQuery({
-		name: 'pageSize',
-		required: false,
-		description: 'Количество элементов на странице',
-		type: Number
-	})
-	@ApiQuery({
-		name: 'filters',
-		required: false,
-		description: 'Фильтры для поиска',
-		type: Object
-	})
-	async findAll(
-		@Query('search') search?: string,
-		@Query('sortBy') sortBy?: string[],
-		@Query('sortOrder') sortOrder?: ('asc' | 'desc')[],
-		@Query('page') page?: number,
-		@Query('pageSize') pageSize?: number,
-		@Query('filters') filters?: any
-	): Promise<{
-		data: Project[]
-		total: number
-		page: number
-		pageSize: number
-	}> {
-		return this.projectService.findAll({
-			search,
-			sortBy,
-			sortOrder,
-			page,
-			pageSize,
-			filters
-		})
+	@UsePipes(new ValidationPipe({ transform: true }))
+	async findAll(@Query() filterProjectDto: FilterProjectDto) {
+		return this.projectService.findAll(filterProjectDto)
 	}
 
 	@Get(':id')
@@ -131,7 +79,7 @@ export class ProjectController {
 	@ApiResponse({
 		status: 200,
 		description: 'Найден проект.',
-		type: CreateProjectDto
+		type: ProjectWithTasksDto
 	})
 	@ApiResponse({ status: 404, description: 'Проект не найден.' })
 	@Auth('admin')
@@ -177,18 +125,31 @@ export class ProjectController {
 	@Auth('admin')
 	async updateProject(
 		@Param('id') id: string,
-		@Body() updateProjectDto: UpdateProjectDto
+		@Body() updateProjectDto: UpdateProjectDto,
+		@Req() req: Request
 	): Promise<Project> {
+		const adminId = req['user'].id
 		const projectId = parseInt(id)
-		return this.projectService.updateProject(projectId, updateProjectDto)
+		return this.projectService.updateProject(projectId, updateProjectDto, adminId)
 	}
 
-	@Delete(':id')
-	@ApiOperation({ summary: 'Удалить проект' })
-	@ApiResponse({ status: 204, description: 'Проект успешно удален.' })
+	@ApiBody({ type: UpdateProjectStatusDto })
+	@ApiResponse({ status: 200, description: 'OK', type: ProjectDto })
+	@ApiResponse({ status: 400, description: 'Неверные данные запроса.' })
 	@ApiResponse({ status: 404, description: 'Проект не найден.' })
+	@Put(':id/status')
 	@Auth('admin')
-	remove(@Param('id') id: string) {
-		return this.projectService.remove(+id)
+	async updateProjectStatus(@Param('id', ParseIntPipe) id: number, @Body() updateProjectStatusDto: UpdateProjectStatusDto, @Req() req: Request) {
+		const adminId = req['user'].id
+		return this.projectService.updateProjectStatus(id, updateProjectStatusDto, adminId)
 	}
+
+	// @Delete(':id')
+	// @ApiOperation({ summary: 'Удалить проект' })
+	// @ApiResponse({ status: 204, description: 'Проект успешно удален.' })
+	// @ApiResponse({ status: 404, description: 'Проект не найден.' })
+	// @Auth('admin')
+	// remove(@Param('id') id: string) {
+	// 	return this.projectService.remove(+id)
+	// }
 }

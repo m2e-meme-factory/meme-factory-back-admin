@@ -5,15 +5,18 @@ import {
 	Post,
 	Body,
 	Param,
-	Delete,
 	Patch,
 	Query,
-	ParseIntPipe
+	ParseIntPipe,
+	Put,
+	UsePipes,
+	ValidationPipe,
+	Req
 } from '@nestjs/common'
 import { UserService } from './user.service'
-import { User } from '@prisma/client'
-import { ApiTags, ApiResponse, ApiQuery, ApiBearerAuth } from '@nestjs/swagger'
-import { CreateUserDto, UpdateUserDto } from './dto/user.dto'
+import { User, UserAdmin, UserRole } from '@prisma/client'
+import { ApiTags, ApiResponse, ApiBearerAuth, ApiBody, ApiParam, ApiOperation } from '@nestjs/swagger'
+import { CreateUserDto, GetUserDto, UpdateUserAdminDto, UpdateUserDto, UpdateUserRoleDto, UserPaginationDto } from './dto/user.dto'
 import { Auth } from 'src/auth/decorators/auth.decorator'
 import { FilterUserDto } from './dto/filter-user.dto'
 
@@ -31,54 +34,22 @@ export class UserController {
 	})
 	@ApiResponse({ status: 400, description: 'Bad Request' })
 	@Auth('admin')
-	async create(@Body() createUserDto: CreateUserDto): Promise<User> {
-		return this.userService.create(createUserDto)
+	async create(@Body() createUserDto: CreateUserDto, @Req() req: Request): Promise<User> {
+		const adminId = req['user'].id
+		return this.userService.create(createUserDto, adminId)
 	}
 
 	@Get()
 	@ApiResponse({
 		status: 200,
 		description: 'Return all users with pagination, sorting, and filtering',
-		type: [UpdateUserDto]
+		type: [UserPaginationDto]
 	})
 	@Auth('admin')
-	@ApiQuery({
-		name: 'search',
-		required: false,
-		type: String,
-		description: 'Search users by name, description or ID'
-	})
-	@ApiQuery({
-		name: 'page',
-		required: false,
-		type: Number,
-		description: 'Page number for pagination',
-		example: 1
-	})
-	@ApiQuery({
-		name: 'limit',
-		required: false,
-		type: Number,
-		description: 'Limit of users per page',
-		example: 10
-	})
-	@ApiQuery({
-		name: 'sortBy',
-		required: false,
-		description: 'Fields to sort by, can be an array of field names',
-		isArray: true,
-		example: ['id', 'name']
-	})
-	@ApiQuery({
-		name: 'sortOrder',
-		required: false,
-		enum: ['asc', 'desc'],
-		description: 'Sort order: asc or desc',
-		example: 'asc'
-	})
+	@UsePipes(new ValidationPipe({ transform: true }))
 	async findAll(
 		@Query() filterDto: FilterUserDto
-	): Promise<{ data: User[]; total: number }> {
+	): Promise<{ data: GetUserDto[]; total: number }> {
 		return this.userService.findAll(filterDto)
 	}
 
@@ -102,22 +73,104 @@ export class UserController {
 	})
 	@ApiResponse({ status: 404, description: 'User not found' })
 	@Auth('admin')
+	@UsePipes(new ValidationPipe({transform: true}))
 	async update(
 		@Param('id') id: number,
-		@Body() updateUserDto: UpdateUserDto
+		@Body() updateUserDto: UpdateUserDto,
+		@Req() req: Request
 	): Promise<User> {
-		return this.userService.update(id, updateUserDto)
+		const adminId = req['user'].id
+		return this.userService.update(id, updateUserDto, adminId)
 	}
 
-	@Delete(':id')
+	@Put(':id/ban')
 	@ApiResponse({
 		status: 200,
-		description: 'The user has been successfully deleted.',
+		description: 'The user has been successfully banned.',
 		type: CreateUserDto
 	})
 	@ApiResponse({ status: 404, description: 'User not found' })
 	@Auth('admin')
-	async remove(@Param('id') id: number): Promise<User> {
-		return this.userService.remove(id)
+	async ban(@Param('id', ParseIntPipe) id: number, @Req() req: Request): Promise<User> {
+		const adminId = req['user'].id
+		return this.userService.ban(id, adminId)
+	}
+	@Put(':id/unban')
+	@ApiResponse({
+		status: 200,
+		description: 'The user has been successfully unbanned.',
+		type: CreateUserDto
+	})
+	@ApiResponse({ status: 404, description: 'User not found' })
+	@Auth('admin')
+	async unban(@Param('id', ParseIntPipe) id: number, @Req() req: Request): Promise<User> {
+		const adminId = req['user'].id
+		return this.userService.unban(id, adminId)
+	}
+
+	@Put(':id/role')
+	@ApiOperation({ summary: 'Изменить роль пользователя' })
+	@ApiParam({ name: 'id', description: 'ID пользователя' })
+	@ApiBody({ type: UpdateUserRoleDto })
+	@ApiResponse({
+		status: 200,
+		description: 'Роль пользователя успешно обновлена.',
+		schema: {
+			example: {
+				id: 1,
+				telegramId: '1234567',
+				username: '1234567',
+				role: UserRole.creator,
+				balance: 0,
+				isBaned: false,
+				isVerified: true,
+				createdAt: '2024-07-31T15:19:16.000Z',
+				inviterRefCode: null,
+				refCode: '1234567'
+			}
+		}
+	})
+	@ApiResponse({ status: 400, description: 'Неверные данные запроса.' })
+	@ApiResponse({ status: 404, description: 'Пользователь не найден.' })
+	@ApiResponse({ status: 403, description: 'Доступ запрещен.' })
+	@Auth('admin')
+	async updateUserRole(
+		@Param('id', ParseIntPipe) id: number,
+		@Body() updateUserRoleDto: UpdateUserRoleDto,
+		@Req() req: Request
+	): Promise<User> {
+		const adminId = req['user'].id
+		return this.userService.updateUserRole(id, updateUserRoleDto.role, adminId)
+	}
+	
+	@Put(':id/is-admin')
+	@ApiOperation({ summary: 'Изменить роль для админа' })
+	@ApiParam({ name: 'id', description: 'ID user admin' })
+	@ApiBody({ type: UpdateUserAdminDto })
+	@ApiResponse({
+		status: 200,
+		description: 'Роль админа успешно обновлена.',
+		schema: {
+			example: {
+				id: 1,
+				email: 'email@mail.ru',
+				password: 'hash',
+				isAdmin: true,
+				createdAt: '2024-07-31T15:19:16.000Z',
+				updatedAt: '2024-07-31T15:19:16.000Z',
+			}
+		}
+	})
+	@ApiResponse({ status: 400, description: 'Неверные данные запроса.' })
+	@ApiResponse({ status: 404, description: 'Пользователь не найден.' })
+	@ApiResponse({ status: 403, description: 'Доступ запрещен.' })
+	@Auth('admin')
+	async updateUserAdmin(
+		@Param('id', ParseIntPipe) id: number,
+		@Body() updateUserAdminDto: UpdateUserAdminDto,
+		@Req() req: Request
+	): Promise<UserAdmin> {
+		const adminId = req['user'].id
+		return this.userService.updateUserAdmin(id, updateUserAdminDto.isAdmin, adminId)
 	}
 }
