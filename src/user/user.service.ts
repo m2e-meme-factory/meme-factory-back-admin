@@ -28,6 +28,11 @@ export class UserService {
 		}
 	}
 
+
+	getPrisma() {
+		return this.prisma
+	}
+
 	notify(action: string, details: any): void {
 		for (const observer of this.observers) {
 			observer.update(action, details)

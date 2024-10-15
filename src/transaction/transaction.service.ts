@@ -46,6 +46,31 @@ export class TransactionService {
 				data: createTransactionDto
 			})
 
+			if (createTransactionDto.fromUserId)
+				await this.prisma.user.update({
+					where: {
+						id: createTransactionDto.fromUserId
+					},
+					data: {
+						balance: {
+							decrement: createTransactionDto.amount
+						}
+					}
+				})
+
+
+			if (createTransactionDto.toUserId)
+				await this.prisma.user.update({
+					where: {
+						id: createTransactionDto.toUserId
+					},
+					data: {
+						balance: {
+							increment: createTransactionDto.amount
+						}
+					}
+				})
+
 			this.notify('create', {
 				action: 'CREATE_TRANSACTION',
 				entityType: 'Transaction',

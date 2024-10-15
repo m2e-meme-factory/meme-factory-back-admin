@@ -1,7 +1,7 @@
 module.exports = {
     apps: [
         {
-            name: "dev-mf-back-admin",
+            name: "mf-back-admin",
             script: "yarn",
             automation: false,
             args: "start",

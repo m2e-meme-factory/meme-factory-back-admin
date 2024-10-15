@@ -130,6 +130,9 @@ export class CreateUserDto {
 }
 
 export class UpdateUserDto extends PartialType(CreateUserDto) {
+	@IsString()
+	telegramId?: string
+	
 	@ApiProperty({
 		description: 'Имя пользователя',
 		example: 'example_user'

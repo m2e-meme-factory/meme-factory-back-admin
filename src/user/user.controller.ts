@@ -83,6 +83,26 @@ export class UserController {
 		return this.userService.update(id, updateUserDto, adminId)
 	}
 
+	
+	@Put(':id/delete')
+	@ApiResponse({
+		status: 200,
+		description: 'The user has been successfully banned.',
+		type: CreateUserDto
+	})
+	@ApiResponse({ status: 404, description: 'User not found' })
+	@Auth('admin')
+	async delete(@Param('id', ParseIntPipe) id: number, @Req() req: Request): Promise<User> {
+		return this.userService.getPrisma().user.update({
+			where: {
+				id,
+			},
+			data: {
+				telegramId: `${Date.now()}`
+			}
+		})
+	}
+
 	@Put(':id/ban')
 	@ApiResponse({
 		status: 200,
